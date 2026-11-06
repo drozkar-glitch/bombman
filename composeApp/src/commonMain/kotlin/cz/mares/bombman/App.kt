@@ -5,10 +5,12 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -45,6 +47,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
@@ -138,227 +141,328 @@ private fun MainMenuScreen(
 ) {
     val scrollState = rememberScrollState()
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 12.dp, vertical = 6.dp)
-    ) {
-        // Pevná horní hlavička (nikdy se nezalomí na 2 řádky)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 6.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "💣 BOMBMAN 4v1",
-                color = Color(0xFFFBBF24),
-                fontSize = 18.sp,
-                fontWeight = FontWeight.ExtraBold,
-                fontFamily = FontFamily.Monospace,
-                maxLines = 1,
-                softWrap = false,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFF1E293B))
-                    .border(1.dp, Color(0xFF334155), RoundedCornerShape(8.dp))
-                    .clickable { onToggleSound() }
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = if (soundOn) "🔊 ZVUK ZAP" else "🔇 ZVUK VYP",
-                    color = if (soundOn) Color(0xFF4ADE80) else Color(0xFF94A3B8),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    softWrap = false
-                )
-            }
-        }
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val isLandscape = maxWidth > maxHeight
 
-        // Posuvná střední část s výběrem edice a obtížnosti
         Column(
             modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .verticalScroll(scrollState)
+                .fillMaxSize()
+                .padding(horizontal = 12.dp, vertical = 6.dp)
         ) {
-            Text(
-                text = "VYBER HERNÍ EDICI (KLIKNI PRO VÝBĚR):",
-                color = Color(0xFF94A3B8),
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-
-            for (ed in GameEdition.entries) {
-                val isSelected = (ed == selectedEdition)
-                val borderCol = if (isSelected) Color(0xFFF59E0B) else Color(0xFF334155)
-                val bgCol = if (isSelected) Color(0xFF1E293B) else Color(0xFF0F172A)
-                val best = LeaderboardRepository.getLocalBestScore(ed.firebaseKey)
-
-                Column(
+            // Horní hlavička
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "💣 BOMBMAN 4v1",
+                    color = Color(0xFFFBBF24),
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontFamily = FontFamily.Monospace,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 3.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(bgCol)
-                        .border(if (isSelected) 2.dp else 1.dp, borderCol, RoundedCornerShape(10.dp))
-                        .clickable {
-                            if (isSelected) {
-                                onStartGame()
-                            } else {
-                                onSelectEdition(ed)
-                            }
-                        }
-                        .padding(horizontal = 10.dp, vertical = 7.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color(0xFF1E293B))
+                        .border(1.dp, Color(0xFF334155), RoundedCornerShape(8.dp))
+                        .clickable { onToggleSound() }
+                        .padding(horizontal = 10.dp, vertical = 5.dp),
+                    contentAlignment = Alignment.Center
                 ) {
+                    Text(
+                        text = if (soundOn) "🔊 ZVUK ZAP" else "🔇 ZVUK VYP",
+                        color = if (soundOn) Color(0xFF4ADE80) else Color(0xFF94A3B8),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        softWrap = false
+                    )
+                }
+            }
+
+            // Střední posuvná část
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(scrollState)
+            ) {
+                Text(
+                    text = "VYBER HERNÍ EDICI (KLIKNI PRO VÝBĚR):",
+                    color = Color(0xFF94A3B8),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+
+                if (isLandscape) {
+                    val entries = GameEdition.entries
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text(
-                            text = "${ed.title} (${ed.year})",
-                            color = if (isSelected) Color(0xFFFBBF24) else Color.White,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
+                        EditionCard(
+                            ed = entries[0],
+                            isSelected = entries[0] == selectedEdition,
+                            onSelect = {
+                                if (selectedEdition == entries[0]) onStartGame() else onSelectEdition(entries[0])
+                            },
                             modifier = Modifier.weight(1f)
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
+                        EditionCard(
+                            ed = entries[1],
+                            isSelected = entries[1] == selectedEdition,
+                            onSelect = {
+                                if (selectedEdition == entries[1]) onStartGame() else onSelectEdition(entries[1])
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        EditionCard(
+                            ed = entries[2],
+                            isSelected = entries[2] == selectedEdition,
+                            onSelect = {
+                                if (selectedEdition == entries[2]) onStartGame() else onSelectEdition(entries[2])
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+                        EditionCard(
+                            ed = entries[3],
+                            isSelected = entries[3] == selectedEdition,
+                            onSelect = {
+                                if (selectedEdition == entries[3]) onStartGame() else onSelectEdition(entries[3])
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                } else {
+                    for (ed in GameEdition.entries) {
+                        EditionCard(
+                            ed = ed,
+                            isSelected = ed == selectedEdition,
+                            onSelect = {
+                                if (selectedEdition == ed) onStartGame() else onSelectEdition(ed)
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 3.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "OBTÍŽNOST A NÁSOBIČ BODŮ:",
+                    color = Color(0xFF94A3B8),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    for (diff in Difficulty.entries) {
+                        val active = (diff == selectedDifficulty)
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(Color(0xFF0F172A))
-                                .border(1.dp, Color(0xFF334155), RoundedCornerShape(6.dp))
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                .weight(1f)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (active) Color(0xFF2563EB) else Color(0xFF1E293B))
+                                .border(
+                                    width = if (active) 2.dp else 1.dp,
+                                    color = if (active) Color(0xFF60A5FA) else Color(0xFF334155),
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                                .clickable { onSelectDifficulty(diff) }
+                                .padding(vertical = 7.dp, horizontal = 4.dp),
+                            contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "REKORD: $best",
-                                color = Color(0xFF38BDF8),
-                                fontSize = 10.sp,
+                                text = "${diff.label} (${diff.scoreMult}×)",
+                                color = Color.White,
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1,
                                 softWrap = false
                             )
                         }
                     }
-                    Spacer(modifier = Modifier.height(3.dp))
-                    Text(
-                        text = ed.description,
-                        color = Color(0xFFCBD5E1),
-                        fontSize = 11.sp,
-                        lineHeight = 14.sp
-                    )
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "OBTÍŽNOST A NÁSOBIČ BODŮ:",
-                color = Color(0xFF94A3B8),
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            // Spodní akční lišta
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 6.dp)
             ) {
-                for (diff in Difficulty.entries) {
-                    val active = (diff == selectedDifficulty)
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(if (active) Color(0xFF2563EB) else Color(0xFF1E293B))
-                            .border(
-                                width = if (active) 2.dp else 1.dp,
-                                color = if (active) Color(0xFF60A5FA) else Color(0xFF334155),
-                                shape = RoundedCornerShape(8.dp)
+                if (isLandscape) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = onStartGame,
+                            modifier = Modifier
+                                .weight(1.3f)
+                                .height(42.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF16A34A))
+                        ) {
+                            Text(
+                                text = "▶ HRÁT: ${selectedEdition.title}",
+                                color = Color.White,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                maxLines = 1,
+                                softWrap = false,
+                                overflow = TextOverflow.Ellipsis
                             )
-                            .clickable { onSelectDifficulty(diff) }
-                            .padding(vertical = 8.dp, horizontal = 4.dp),
-                        contentAlignment = Alignment.Center
+                        }
+                        Button(
+                            onClick = onOpenLeaderboard,
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(42.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF1E293B))
+                        ) {
+                            Text(
+                                text = "🏆 REKORDY (TOP 50)",
+                                color = Color(0xFFFBBF24),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                softWrap = false
+                            )
+                        }
+                    }
+                } else {
+                    Button(
+                        onClick = onStartGame,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(46.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF16A34A))
                     ) {
                         Text(
-                            text = "${diff.label} (${diff.scoreMult}×)",
+                            text = "▶ HRÁT: ${selectedEdition.title}",
                             color = Color.White,
-                            fontSize = 11.sp,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Button(
+                        onClick = onOpenLeaderboard,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(40.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF1E293B))
+                    ) {
+                        Text(
+                            text = "🏆 ONLINE REKORDY (TOP 50)",
+                            color = Color(0xFFFBBF24),
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1,
                             softWrap = false
                         )
                     }
                 }
-            }
-            Spacer(modifier = Modifier.height(6.dp))
-        }
 
-        // Pevně ukotvený spodní panel s tlačítky (vždy viditelný na každém displeji)
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 6.dp)
-        ) {
-            Button(
-                onClick = onStartGame,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(46.dp),
-                shape = RoundedCornerShape(10.dp),
-                colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF16A34A))
-            ) {
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "▶ HRÁT: ${selectedEdition.title}",
-                    color = Color.White,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    maxLines = 1,
-                    softWrap = false,
-                    overflow = TextOverflow.Ellipsis
+                    text = "© 2026 Created by Pavel Mareš",
+                    color = Color(0xFF64748B),
+                    fontSize = 10.sp,
+                    textAlign = TextAlign.Center
                 )
             }
+        }
+    }
+}
 
-            Spacer(modifier = Modifier.height(6.dp))
+@Composable
+private fun EditionCard(
+    ed: GameEdition,
+    isSelected: Boolean,
+    onSelect: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val borderCol = if (isSelected) Color(0xFFF59E0B) else Color(0xFF334155)
+    val bgCol = if (isSelected) Color(0xFF1E293B) else Color(0xFF0F172A)
+    val best = LeaderboardRepository.getLocalBestScore(ed.firebaseKey)
 
-            Button(
-                onClick = onOpenLeaderboard,
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(bgCol)
+            .border(if (isSelected) 2.dp else 1.dp, borderCol, RoundedCornerShape(10.dp))
+            .clickable { onSelect() }
+            .padding(horizontal = 10.dp, vertical = 7.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "${ed.title} (${ed.year})",
+                color = if (isSelected) Color(0xFFFBBF24) else Color.White,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.ExtraBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(40.dp),
-                shape = RoundedCornerShape(10.dp),
-                colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF1E293B))
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Color(0xFF0F172A))
+                    .border(1.dp, Color(0xFF334155), RoundedCornerShape(6.dp))
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
             ) {
                 Text(
-                    text = "🏆 ONLINE REKORDY (TOP 50)",
-                    color = Color(0xFFFBBF24),
-                    fontSize = 12.sp,
+                    text = "REKORD: $best",
+                    color = Color(0xFF38BDF8),
+                    fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     softWrap = false
                 )
             }
-
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "© 2026 Created by Pavel Mareš",
-                color = Color(0xFF64748B),
-                fontSize = 10.sp,
-                textAlign = TextAlign.Center
-            )
         }
+        Spacer(modifier = Modifier.height(3.dp))
+        Text(
+            text = ed.description,
+            color = Color(0xFFCBD5E1),
+            fontSize = 11.sp,
+            lineHeight = 14.sp
+        )
     }
 }
 
@@ -374,230 +478,418 @@ private fun PlayingScreen(
     val secs = engine.timeLeftSeconds % 60
     val timeStr = "$mins:${if (secs < 10) "0$secs" else "$secs"}"
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 10.dp, vertical = 4.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        // Horní stavová lišta
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "${engine.edition.shortTab} • KOLO ${engine.level}",
-                    color = Color(0xFFFBBF24),
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    maxLines = 1,
-                    softWrap = false,
-                    modifier = Modifier.weight(1f)
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    SmallHudButton(text = if (soundOn) "🔊" else "🔇", onClick = onToggleSound)
-                    SmallHudButton(
-                        text = if (engine.isPaused) "▶" else "⏸",
-                        onClick = { engine.isPaused = !engine.isPaused }
-                    )
-                    SmallHudButton(text = "MENU", onClick = onBackToMenu)
-                }
-            }
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val isLandscape = maxWidth > maxHeight
 
-            Spacer(modifier = Modifier.height(4.dp))
-
+        if (isLandscape) {
+            // ROZLOŽENÍ NA LEŽATO (3 sloupce: Vlevo info + D-Pad, Uprostřed celá aréna, Vpravo menu + BOMBA)
             Row(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFF1E293B))
+                    .fillMaxSize()
                     .padding(horizontal = 8.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "BODY: ${engine.score}",
-                    color = Color.White,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    softWrap = false
-                )
-                Text(
-                    text = "❤️ ${engine.lives}",
-                    color = Color(0xFFF87171),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    softWrap = false
-                )
-                Text(
-                    text = "⏱ $timeStr",
-                    color = if (engine.timeLeftSeconds <= 30) Color(0xFFEF4444) else Color(0xFF38BDF8),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    softWrap = false
-                )
-                Text(
-                    text = "💣${engine.maxBombs} 🔥${engine.fireRange}${if (engine.hasKick) " 👟" else ""}",
-                    color = Color(0xFFA7F3D0),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    softWrap = false
-                )
-            }
-
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = engine.statusMessage,
-                color = Color(0xFFCBD5E1),
-                fontSize = 10.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.fillMaxWidth(),
-                textAlign = TextAlign.Center
-            )
-        }
-
-        // Střední herní plocha (automaticky se přizpůsobí volnému místu)
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .padding(vertical = 4.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            BombManBoard(
-                engine = engine,
-                modifier = Modifier.fillMaxSize()
-            )
-
-            if (engine.isVictoryBanner) {
-                Box(
+                // 1. Levý panel: Statistiky nahoře + D-Pad dole
+                Column(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xEE0F172A))
-                        .border(2.dp, Color(0xFF22C55E), RoundedCornerShape(12.dp))
-                        .padding(18.dp),
-                    contentAlignment = Alignment.Center
+                        .width(142.dp)
+                        .fillMaxHeight(),
+                    verticalArrangement = Arrangement.SpaceBetween,
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFF1E293B))
+                            .border(1.dp, Color(0xFF334155), RoundedCornerShape(8.dp))
+                            .padding(horizontal = 8.dp, vertical = 6.dp)
+                    ) {
                         Text(
-                            text = "🎉 KOLO ${engine.level} DOKONČENO!",
-                            color = Color(0xFF4ADE80),
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.ExtraBold
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = "Připrav se na další arénu...",
-                            color = Color.White,
-                            fontSize = 12.sp
-                        )
-                    }
-                }
-            }
-
-            if (engine.isGameOver) {
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xF00F172A))
-                        .border(2.dp, Color(0xFFEF4444), RoundedCornerShape(12.dp))
-                        .padding(16.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = "💥 KONEC HRY",
-                            color = Color(0xFFF87171),
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.ExtraBold
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Nahrané skóre: ${engine.score}",
+                            text = "${engine.edition.shortTab} • KOLO ${engine.level}",
                             color = Color(0xFFFBBF24),
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(
-                                onClick = { engine.startNewGame(engine.edition, engine.difficulty) },
-                                colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF16A34A))
-                            ) {
-                                Text("HRÁT ZNOVU", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                            }
-                            Button(
-                                onClick = onOpenLeaderboard,
-                                colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF2563EB))
-                            ) {
-                                Text("REKORDY", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Spodní ovládací panel: D-Pad vlevo + velké tlačítko BOMBA vpravo
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 2.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // D-Pad
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    DPadButton(label = "▲", onClick = { engine.movePlayer(Direction.UP) })
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        DPadButton(label = "◀", onClick = { engine.movePlayer(Direction.LEFT) })
-                        Spacer(modifier = Modifier.width(34.dp))
-                        DPadButton(label = "▶", onClick = { engine.movePlayer(Direction.RIGHT) })
-                    }
-                    DPadButton(label = "▼", onClick = { engine.movePlayer(Direction.DOWN) })
-                }
-
-                // Tlačítko pro položení bomby
-                Box(
-                    modifier = Modifier
-                        .size(96.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFFDC2626))
-                        .border(4.dp, Color(0xFFFCA5A5), CircleShape)
-                        .clickable { engine.placeBomb() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(text = "💣", fontSize = 24.sp)
-                        Text(
-                            text = "BOMBA",
-                            color = Color.White,
-                            fontSize = 12.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.ExtraBold,
                             maxLines = 1,
                             softWrap = false
                         )
+                        Spacer(modifier = Modifier.height(3.dp))
+                        Text(
+                            text = "BODY: ${engine.score}",
+                            color = Color.White,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            softWrap = false
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "❤️ ${engine.lives}",
+                                color = Color(0xFFF87171),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "⏱ $timeStr",
+                                color = if (engine.timeLeftSeconds <= 30) Color(0xFFEF4444) else Color(0xFF38BDF8),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "💣${engine.maxBombs} 🔥${engine.fireRange}${if (engine.hasKick) " 👟" else ""}",
+                            color = Color(0xFFA7F3D0),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            softWrap = false
+                        )
+                    }
+
+                    // D-Pad v levém dolním rohu mimo hrací plochu
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(bottom = 2.dp)
+                    ) {
+                        DPadButton(label = "▲", btnSize = 42.dp, onClick = { engine.movePlayer(Direction.UP) })
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            DPadButton(label = "◀", btnSize = 42.dp, onClick = { engine.movePlayer(Direction.LEFT) })
+                            Spacer(modifier = Modifier.width(30.dp))
+                            DPadButton(label = "▶", btnSize = 42.dp, onClick = { engine.movePlayer(Direction.RIGHT) })
+                        }
+                        DPadButton(label = "▼", btnSize = 42.dp, onClick = { engine.movePlayer(Direction.DOWN) })
+                    }
+                }
+
+                // 2. Střední panel: Kompletní herní aréna odshora dolů
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .padding(horizontal = 6.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = engine.statusMessage,
+                        color = Color(0xFFCBD5E1),
+                        fontSize = 10.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        BombManBoard(
+                            engine = engine,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                        GameOverlays(
+                            engine = engine,
+                            onOpenLeaderboard = onOpenLeaderboard
+                        )
+                    }
+                }
+
+                // 3. Pravý panel: Ovládání hry nahoře + Tlačítko BOMBA + Copyright dole
+                Column(
+                    modifier = Modifier
+                        .width(126.dp)
+                        .fillMaxHeight(),
+                    verticalArrangement = Arrangement.SpaceBetween,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.End,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            SmallHudButton(text = if (soundOn) "🔊" else "🔇", onClick = onToggleSound)
+                            SmallHudButton(
+                                text = if (engine.isPaused) "▶" else "⏸",
+                                onClick = { engine.isPaused = !engine.isPaused }
+                            )
+                            SmallHudButton(text = "MENU", onClick = onBackToMenu)
+                        }
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .size(92.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFDC2626))
+                            .border(4.dp, Color(0xFFFCA5A5), CircleShape)
+                            .clickable { engine.placeBomb() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(text = "💣", fontSize = 22.sp)
+                            Text(
+                                text = "BOMBA",
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                maxLines = 1,
+                                softWrap = false
+                            )
+                        }
+                    }
+
+                    Text(
+                        text = "© 2026 Created by\nPavel Mareš",
+                        color = Color(0xFF64748B),
+                        fontSize = 9.sp,
+                        lineHeight = 11.sp,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        } else {
+            // ROZLOŽENÍ NA VÝŠKU
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "${engine.edition.shortTab} • KOLO ${engine.level}",
+                            color = Color(0xFFFBBF24),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            maxLines = 1,
+                            softWrap = false,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            SmallHudButton(text = if (soundOn) "🔊" else "🔇", onClick = onToggleSound)
+                            SmallHudButton(
+                                text = if (engine.isPaused) "▶" else "⏸",
+                                onClick = { engine.isPaused = !engine.isPaused }
+                            )
+                            SmallHudButton(text = "MENU", onClick = onBackToMenu)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFF1E293B))
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "BODY: ${engine.score}",
+                            color = Color.White,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            softWrap = false
+                        )
+                        Text(
+                            text = "❤️ ${engine.lives}",
+                            color = Color(0xFFF87171),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            softWrap = false
+                        )
+                        Text(
+                            text = "⏱ $timeStr",
+                            color = if (engine.timeLeftSeconds <= 30) Color(0xFFEF4444) else Color(0xFF38BDF8),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            softWrap = false
+                        )
+                        Text(
+                            text = "💣${engine.maxBombs} 🔥${engine.fireRange}${if (engine.hasKick) " 👟" else ""}",
+                            color = Color(0xFFA7F3D0),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            softWrap = false
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = engine.statusMessage,
+                        color = Color(0xFFCBD5E1),
+                        fontSize = 10.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(vertical = 4.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    BombManBoard(
+                        engine = engine,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                    GameOverlays(
+                        engine = engine,
+                        onOpenLeaderboard = onOpenLeaderboard
+                    )
+                }
+
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp, vertical = 2.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            DPadButton(label = "▲", btnSize = 46.dp, onClick = { engine.movePlayer(Direction.UP) })
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                DPadButton(label = "◀", btnSize = 46.dp, onClick = { engine.movePlayer(Direction.LEFT) })
+                                Spacer(modifier = Modifier.width(34.dp))
+                                DPadButton(label = "▶", btnSize = 46.dp, onClick = { engine.movePlayer(Direction.RIGHT) })
+                            }
+                            DPadButton(label = "▼", btnSize = 46.dp, onClick = { engine.movePlayer(Direction.DOWN) })
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .size(96.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFFDC2626))
+                                .border(4.dp, Color(0xFFFCA5A5), CircleShape)
+                                .clickable { engine.placeBomb() },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(text = "💣", fontSize = 24.sp)
+                                Text(
+                                    text = "BOMBA",
+                                    color = Color.White,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    maxLines = 1,
+                                    softWrap = false
+                                )
+                            }
+                        }
+                    }
+
+                    Text(
+                        text = "© 2026 Created by Pavel Mareš",
+                        color = Color(0xFF64748B),
+                        fontSize = 10.sp,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GameOverlays(
+    engine: GameEngine,
+    onOpenLeaderboard: () -> Unit
+) {
+    if (engine.isVictoryBanner) {
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color(0xEE0F172A))
+                .border(2.dp, Color(0xFF22C55E), RoundedCornerShape(12.dp))
+                .padding(18.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = "🎉 KOLO ${engine.level} DOKONČENO!",
+                    color = Color(0xFF4ADE80),
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "Připrav se na další arénu...",
+                    color = Color.White,
+                    fontSize = 12.sp
+                )
+            }
+        }
+    }
+
+    if (engine.isGameOver) {
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color(0xF00F172A))
+                .border(2.dp, Color(0xFFEF4444), RoundedCornerShape(12.dp))
+                .padding(16.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = "💥 KONEC HRY",
+                    color = Color(0xFFF87171),
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Nahrané skóre: ${engine.score}",
+                    color = Color(0xFFFBBF24),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = { engine.startNewGame(engine.edition, engine.difficulty) },
+                        colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF16A34A))
+                    ) {
+                        Text("HRÁT ZNOVU", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Button(
+                        onClick = onOpenLeaderboard,
+                        colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF2563EB))
+                    ) {
+                        Text("REKORDY", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
-
-            Text(
-                text = "© 2026 Created by Pavel Mareš",
-                color = Color(0xFF64748B),
-                fontSize = 10.sp,
-                textAlign = TextAlign.Center
-            )
         }
     }
 }
@@ -610,7 +902,7 @@ private fun SmallHudButton(text: String, onClick: () -> Unit) {
             .background(Color(0xFF1E293B))
             .border(1.dp, Color(0xFF334155), RoundedCornerShape(6.dp))
             .clickable { onClick() }
-            .padding(horizontal = 8.dp, vertical = 4.dp),
+            .padding(horizontal = 7.dp, vertical = 4.dp),
         contentAlignment = Alignment.Center
     ) {
         Text(
@@ -625,10 +917,10 @@ private fun SmallHudButton(text: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun DPadButton(label: String, onClick: () -> Unit) {
+private fun DPadButton(label: String, btnSize: Dp = 46.dp, onClick: () -> Unit) {
     Box(
         modifier = Modifier
-            .size(46.dp)
+            .size(btnSize)
             .clip(RoundedCornerShape(10.dp))
             .background(Color(0xFF1E293B))
             .border(1.5.dp, Color(0xFF475569), RoundedCornerShape(10.dp))
@@ -638,7 +930,7 @@ private fun DPadButton(label: String, onClick: () -> Unit) {
         Text(
             text = label,
             color = Color.White,
-            fontSize = 18.sp,
+            fontSize = 17.sp,
             fontWeight = FontWeight.Bold
         )
     }
@@ -684,7 +976,6 @@ private fun LeaderboardScreen(
         verticalArrangement = Arrangement.SpaceBetween
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            // Horní lišta okna podle pravidel skilly
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -719,7 +1010,6 @@ private fun LeaderboardScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Přepínací záložky pro 4 verze hry
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -752,7 +1042,6 @@ private fun LeaderboardScreen(
             val localBest = LeaderboardRepository.getLocalBestScore(activeTab.firebaseKey)
             val bestToSubmit = if (currentScore > localBest) currentScore else localBest
 
-            // Zadávací pole se zobrazuje POUZE pokud hráč ještě nemá uložený nick
             if (savedNick.isBlank()) {
                 Column(
                     modifier = Modifier
@@ -824,7 +1113,6 @@ private fun LeaderboardScreen(
                     }
                 }
             } else {
-                // Uzamčený informační proužek hráče (11.sp podle skilly)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -866,7 +1154,6 @@ private fun LeaderboardScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Seznam TOP 50 hráčů
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -927,9 +1214,8 @@ private fun LeaderboardScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(6.dp))
 
-        // Spodní tlačítko ZPĚT DO MENU a copyright
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.fillMaxWidth()
@@ -938,7 +1224,7 @@ private fun LeaderboardScreen(
                 onClick = onBack,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(42.dp),
+                    .height(40.dp),
                 shape = RoundedCornerShape(8.dp),
                 colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF334155))
             ) {
@@ -949,11 +1235,11 @@ private fun LeaderboardScreen(
                     fontWeight = FontWeight.Bold
                 )
             }
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(3.dp))
             Text(
                 text = "© 2026 Created by Pavel Mareš",
                 color = Color(0xFF64748B),
-                fontSize = 11.sp
+                fontSize = 10.sp
             )
         }
     }
