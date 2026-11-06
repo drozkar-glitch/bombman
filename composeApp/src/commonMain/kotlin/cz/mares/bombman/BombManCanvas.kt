@@ -4,10 +4,13 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
@@ -25,84 +28,97 @@ fun BombManBoard(
     modifier: Modifier = Modifier
 ) {
     val tick = engine.renderTick
-    val ratio = engine.gridWidth.toFloat() / engine.gridHeight.toFloat()
+    val targetRatio = engine.gridWidth.toFloat() / engine.gridHeight.toFloat()
 
-    Box(
-        modifier = modifier
-            .aspectRatio(ratio)
-            .clip(RoundedCornerShape(10.dp))
-            .border(2.dp, Color(0xFF334155), RoundedCornerShape(10.dp))
-            .background(Color(0xFF0F172A))
+    BoxWithConstraints(
+        modifier = modifier,
+        contentAlignment = Alignment.Center
     ) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            if (tick < 0) return@Canvas
+        val availW = maxWidth
+        val availH = maxHeight
+        val currentRatio = if (availH.value > 0f) availW.value / availH.value else targetRatio
 
-            val cw = size.width / engine.gridWidth
-            val ch = size.height / engine.gridHeight
+        val boardW = if (currentRatio > targetRatio) availH * targetRatio else availW
+        val boardH = if (currentRatio > targetRatio) availH else availW / targetRatio
 
-            // 1. Podlaha a zdi
-            for (gx in 0 until engine.gridWidth) {
-                for (gy in 0 until engine.gridHeight) {
-                    val left = gx * cw
-                    val top = gy * ch
+        Box(
+            modifier = Modifier
+                .width(boardW)
+                .height(boardH)
+                .clip(RoundedCornerShape(8.dp))
+                .border(2.dp, Color(0xFF334155), RoundedCornerShape(8.dp))
+                .background(Color(0xFF0F172A))
+        ) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                if (tick < 0) return@Canvas
 
-                    drawFloorTile(engine.edition, gx, gy, left, top, cw, ch)
+                val cw = size.width / engine.gridWidth
+                val ch = size.height / engine.gridHeight
 
-                    when (engine.getTile(gx, gy)) {
-                        TileType.HARD_WALL -> drawHardWall(engine.edition, gx, gy, left, top, cw, ch)
-                        TileType.SOFT_WALL -> drawSoftWall(engine.edition, left, top, cw, ch)
-                        TileType.EMPTY -> {
-                            if (engine.exitRevealed && gx == engine.exitX && gy == engine.exitY) {
-                                val allDead = engine.enemies.none { it.alive }
-                                drawExitPortal(engine.edition, left, top, cw, ch, allDead, tick)
-                            }
-                            val pu = engine.getVisiblePowerUp(gx, gy)
-                            if (pu != PowerUpType.NONE) {
-                                drawPowerUpItem(pu, left, top, cw, ch, tick)
+                // 1. Podlaha a zdi
+                for (gx in 0 until engine.gridWidth) {
+                    for (gy in 0 until engine.gridHeight) {
+                        val left = gx * cw
+                        val top = gy * ch
+
+                        drawFloorTile(engine.edition, gx, gy, left, top, cw, ch)
+
+                        when (engine.getTile(gx, gy)) {
+                            TileType.HARD_WALL -> drawHardWall(engine.edition, gx, gy, left, top, cw, ch)
+                            TileType.SOFT_WALL -> drawSoftWall(engine.edition, left, top, cw, ch)
+                            TileType.EMPTY -> {
+                                if (engine.exitRevealed && gx == engine.exitX && gy == engine.exitY) {
+                                    val allDead = engine.enemies.none { it.alive }
+                                    drawExitPortal(engine.edition, left, top, cw, ch, allDead, tick)
+                                }
+                                val pu = engine.getVisiblePowerUp(gx, gy)
+                                if (pu != PowerUpType.NONE) {
+                                    drawPowerUpItem(pu, left, top, cw, ch, tick)
+                                }
                             }
                         }
                     }
                 }
-            }
 
-            // 2. Položené bomby
-            for (b in engine.bombs) {
-                drawBomb(b.x * cw, b.y * ch, cw, ch, b.ticksLeft)
-            }
-
-            // 3. Plameny výbuchů
-            for (f in engine.flames) {
-                drawFlame(f.x * cw, f.y * ch, cw, ch, f.ticksLeft)
-            }
-
-            // 4. Nepřátelé a AI Bomberman soupeři
-            for (e in engine.enemies) {
-                if (e.alive) {
-                    drawEnemy(e, e.x * cw, e.y * ch, cw, ch, tick)
+                // 2. Položené bomby
+                for (b in engine.bombs) {
+                    drawBomb(b.x * cw, b.y * ch, cw, ch, b.ticksLeft)
                 }
-            }
 
-            // 5. Hráč
-            if (!engine.isGameOver) {
-                val blinkHide = engine.playerInvulnerableTicks > 0 && (engine.playerInvulnerableTicks % 4 < 2)
-                if (!blinkHide) {
-                    if (engine.edition == GameEdition.BOMBIC) {
-                        drawWormPlayer(engine.playerX * cw, engine.playerY * ch, cw, ch, engine.playerFacing)
-                    } else {
-                        val suitColor = when (engine.edition) {
-                            GameEdition.DYNA -> Color(0xFF2563EB)
-                            GameEdition.ATOMIC -> Color(0xFF10B981)
-                            GameEdition.MRBOOM -> Color(0xFF8B5CF6)
-                            GameEdition.BOMBIC -> Color(0xFF2563EB)
+                // 3. Plameny výbuchů
+                for (f in engine.flames) {
+                    drawFlame(f.x * cw, f.y * ch, cw, ch, f.ticksLeft)
+                }
+
+                // 4. Nepřátelé a AI Bomberman soupeři
+                for (e in engine.enemies) {
+                    if (e.alive) {
+                        drawEnemy(e, e.x * cw, e.y * ch, cw, ch, tick)
+                    }
+                }
+
+                // 5. Hráč
+                if (!engine.isGameOver) {
+                    val blinkHide = engine.playerInvulnerableTicks > 0 && (engine.playerInvulnerableTicks % 4 < 2)
+                    if (!blinkHide) {
+                        if (engine.edition == GameEdition.BOMBIC) {
+                            drawWormPlayer(engine.playerX * cw, engine.playerY * ch, cw, ch, engine.playerFacing)
+                        } else {
+                            val suitColor = when (engine.edition) {
+                                GameEdition.DYNA -> Color(0xFF2563EB)
+                                GameEdition.ATOMIC -> Color(0xFF10B981)
+                                GameEdition.MRBOOM -> Color(0xFF8B5CF6)
+                                GameEdition.BOMBIC -> Color(0xFF2563EB)
+                            }
+                            drawBomberCharacter(
+                                left = engine.playerX * cw,
+                                top = engine.playerY * ch,
+                                cw = cw,
+                                ch = ch,
+                                helmetColor = Color.White,
+                                suitColor = suitColor
+                            )
                         }
-                        drawBomberCharacter(
-                            left = engine.playerX * cw,
-                            top = engine.playerY * ch,
-                            cw = cw,
-                            ch = ch,
-                            helmetColor = Color.White,
-                            suitColor = suitColor
-                        )
                     }
                 }
             }
@@ -185,7 +201,6 @@ private fun DrawScope.drawSoftWall(
 ) {
     when (edition) {
         GameEdition.BOMBIC -> {
-            // Zelený zahradní keř / dřevěná bedýnka
             drawRoundRect(
                 color = Color(0xFF15803D),
                 topLeft = Offset(left + cw * 0.06f, top + ch * 0.06f),
@@ -197,7 +212,6 @@ private fun DrawScope.drawSoftWall(
             drawCircle(Color(0xFF4ADE80), cw * 0.18f, Offset(left + cw * 0.50f, top + ch * 0.62f))
         }
         GameEdition.ATOMIC -> {
-            // Výstražná bedna
             drawRect(Color(0xFFB45309), Offset(left + 1f, top + 1f), Size(cw - 2f, ch - 2f))
             drawRect(Color(0xFFF59E0B), Offset(left + cw * 0.12f, top + ch * 0.12f), Size(cw * 0.76f, ch * 0.76f))
             drawLine(
@@ -214,7 +228,6 @@ private fun DrawScope.drawSoftWall(
             )
         }
         else -> {
-            // Klasické červené cihly со spárami
             drawRect(Color(0xFFB91C1C), Offset(left + 1f, top + 1f), Size(cw - 2f, ch - 2f))
             val mortar = Color(0xFFE2E8F0)
             drawLine(mortar, Offset(left, top + ch * 0.5f), Offset(left + cw, top + ch * 0.5f), strokeWidth = 2f)
@@ -291,7 +304,6 @@ private fun DrawScope.drawPowerUpItem(
         size = Size(cw * (0.9f - 2 * pulse), ch * (0.9f - 2 * pulse)),
         cornerRadius = CornerRadius(cw * 0.16f, ch * 0.16f)
     )
-    // Středový symbol bonusu
     val cx = left + cw * 0.5f
     val cy = top + ch * 0.5f
     when (pu) {
@@ -325,7 +337,6 @@ private fun DrawScope.drawBomb(
         radius = cw * 0.10f,
         center = Offset(cx - cw * 0.12f, cy - ch * 0.12f)
     )
-    // Knot a jiskra
     drawLine(
         color = Color(0xFFFBBF24),
         start = Offset(cx, cy - ch * 0.32f),
@@ -373,26 +384,22 @@ private fun DrawScope.drawBomberCharacter(
     suitColor: Color
 ) {
     val cx = left + cw * 0.5f
-    // Tělo
     drawRoundRect(
         color = suitColor,
         topLeft = Offset(left + cw * 0.26f, top + ch * 0.52f),
         size = Size(cw * 0.48f, ch * 0.38f),
         cornerRadius = CornerRadius(cw * 0.15f, ch * 0.15f)
     )
-    // Helma
     drawCircle(
         color = helmetColor,
         radius = cw * 0.32f,
         center = Offset(cx, top + ch * 0.38f)
     )
-    // Anténka na helmě
     drawCircle(
         color = Color(0xFFEC4899),
         radius = cw * 0.09f,
         center = Offset(cx, top + ch * 0.09f)
     )
-    // Obličejový průzor a oči
     drawRoundRect(
         color = Color(0xFFFDE68A),
         topLeft = Offset(left + cw * 0.28f, top + ch * 0.28f),
@@ -412,11 +419,9 @@ private fun DrawScope.drawWormPlayer(
 ) {
     val cx = left + cw * 0.5f
     val cy = top + ch * 0.55f
-    // Články červíka Bombíče
     drawCircle(Color(0xFFF472B6), cw * 0.22f, Offset(cx - facing.dx * cw * 0.16f, cy + ch * 0.14f))
     drawCircle(Color(0xFFFBBF24), cw * 0.28f, Offset(cx, cy))
     drawCircle(Color(0xFFFDE047), cw * 0.30f, Offset(cx, top + ch * 0.36f))
-    // Velké vykulené oči
     drawCircle(Color.White, cw * 0.11f, Offset(cx - cw * 0.11f, top + ch * 0.32f))
     drawCircle(Color.White, cw * 0.11f, Offset(cx + cw * 0.11f, top + ch * 0.32f))
     drawCircle(Color.Black, cw * 0.055f, Offset(cx - cw * 0.10f, top + ch * 0.32f))
