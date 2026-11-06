@@ -19,9 +19,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.Button
 import androidx.compose.material.ButtonDefaults
 import androidx.compose.material.MaterialTheme
@@ -134,60 +136,73 @@ private fun MainMenuScreen(
     onStartGame: () -> Unit,
     onOpenLeaderboard: () -> Unit
 ) {
+    val scrollState = rememberScrollState()
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 14.dp, vertical = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.SpaceBetween
+            .padding(horizontal = 12.dp, vertical = 6.dp)
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.fillMaxWidth()
+        // Pevná horní hlavička (nikdy se nezalomí na 2 řádky)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 6.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            Text(
+                text = "💣 BOMBMAN 4v1",
+                color = Color(0xFFFBBF24),
+                fontSize = 18.sp,
+                fontWeight = FontWeight.ExtraBold,
+                fontFamily = FontFamily.Monospace,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFF1E293B))
+                    .border(1.dp, Color(0xFF334155), RoundedCornerShape(8.dp))
+                    .clickable { onToggleSound() }
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "💣 BOMBMAN 4v1",
-                    color = Color(0xFFFBBF24),
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    fontFamily = FontFamily.Monospace
+                    text = if (soundOn) "🔊 ZVUK ZAP" else "🔇 ZVUK VYP",
+                    color = if (soundOn) Color(0xFF4ADE80) else Color(0xFF94A3B8),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    softWrap = false
                 )
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color(0xFF1E293B))
-                        .border(1.dp, Color(0xFF334155), RoundedCornerShape(8.dp))
-                        .clickable { onToggleSound() }
-                        .padding(horizontal = 10.dp, vertical = 6.dp)
-                ) {
-                    Text(
-                        text = if (soundOn) "🔊 ZVUK ZAP" else "🔇 ZVUK VYP",
-                        color = if (soundOn) Color(0xFF4ADE80) else Color(0xFF94A3B8),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
             }
+        }
 
-            Spacer(modifier = Modifier.height(8.dp))
+        // Posuvná střední část s výběrem edice a obtížnosti
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .verticalScroll(scrollState)
+        ) {
             Text(
-                text = "VYBER HERNÍ EDICI:",
+                text = "VYBER HERNÍ EDICI (KLIKNI PRO VÝBĚR):",
                 color = Color(0xFF94A3B8),
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.align(Alignment.Start)
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold
             )
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
             for (ed in GameEdition.entries) {
                 val isSelected = (ed == selectedEdition)
                 val borderCol = if (isSelected) Color(0xFFF59E0B) else Color(0xFF334155)
                 val bgCol = if (isSelected) Color(0xFF1E293B) else Color(0xFF0F172A)
+                val best = LeaderboardRepository.getLocalBestScore(ed.firebaseKey)
 
                 Column(
                     modifier = Modifier
@@ -196,8 +211,14 @@ private fun MainMenuScreen(
                         .clip(RoundedCornerShape(10.dp))
                         .background(bgCol)
                         .border(if (isSelected) 2.dp else 1.dp, borderCol, RoundedCornerShape(10.dp))
-                        .clickable { onSelectEdition(ed) }
-                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                        .clickable {
+                            if (isSelected) {
+                                onStartGame()
+                            } else {
+                                onSelectEdition(ed)
+                            }
+                        }
+                        .padding(horizontal = 10.dp, vertical = 7.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -207,24 +228,36 @@ private fun MainMenuScreen(
                         Text(
                             text = "${ed.title} (${ed.year})",
                             color = if (isSelected) Color(0xFFFBBF24) else Color.White,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.ExtraBold
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
                         )
-                        val best = LeaderboardRepository.getLocalBestScore(ed.firebaseKey)
-                        Text(
-                            text = "REKORD: $best",
-                            color = Color(0xFF38BDF8),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Color(0xFF0F172A))
+                                .border(1.dp, Color(0xFF334155), RoundedCornerShape(6.dp))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = "REKORD: $best",
+                                color = Color(0xFF38BDF8),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                softWrap = false
+                            )
+                        }
                     }
-                    Spacer(modifier = Modifier.height(2.dp))
+                    Spacer(modifier = Modifier.height(3.dp))
                     Text(
                         text = ed.description,
                         color = Color(0xFFCBD5E1),
                         fontSize = 11.sp,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
+                        lineHeight = 14.sp
                     )
                 }
             }
@@ -233,15 +266,14 @@ private fun MainMenuScreen(
             Text(
                 text = "OBTÍŽNOST A NÁSOBIČ BODŮ:",
                 color = Color(0xFF94A3B8),
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.align(Alignment.Start)
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold
             )
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 for (diff in Difficulty.entries) {
                     val active = (diff == selectedDifficulty)
@@ -251,68 +283,79 @@ private fun MainMenuScreen(
                             .clip(RoundedCornerShape(8.dp))
                             .background(if (active) Color(0xFF2563EB) else Color(0xFF1E293B))
                             .border(
-                                1.dp,
-                                if (active) Color(0xFF60A5FA) else Color(0xFF334155),
-                                RoundedCornerShape(8.dp)
+                                width = if (active) 2.dp else 1.dp,
+                                color = if (active) Color(0xFF60A5FA) else Color(0xFF334155),
+                                shape = RoundedCornerShape(8.dp)
                             )
                             .clickable { onSelectDifficulty(diff) }
-                            .padding(vertical = 8.dp),
+                            .padding(vertical = 8.dp, horizontal = 4.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = "${diff.label} (${diff.scoreMult}×)",
                             color = Color.White,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            softWrap = false
                         )
                     }
                 }
             }
+            Spacer(modifier = Modifier.height(6.dp))
         }
 
+        // Pevně ukotvený spodní panel s tlačítky (vždy viditelný na každém displeji)
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 6.dp)
         ) {
             Button(
                 onClick = onStartGame,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(48.dp),
+                    .height(46.dp),
                 shape = RoundedCornerShape(10.dp),
                 colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF16A34A))
             ) {
                 Text(
-                    text = "▶ SPUSTIT: ${selectedEdition.title}",
+                    text = "▶ HRÁT: ${selectedEdition.title}",
                     color = Color.White,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.ExtraBold
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
             Button(
                 onClick = onOpenLeaderboard,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(42.dp),
+                    .height(40.dp),
                 shape = RoundedCornerShape(10.dp),
                 colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF1E293B))
             ) {
                 Text(
                     text = "🏆 ONLINE REKORDY (TOP 50)",
                     color = Color(0xFFFBBF24),
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    softWrap = false
                 )
             }
 
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = "© 2026 Created by Pavel Mareš",
                 color = Color(0xFF64748B),
-                fontSize = 11.sp,
+                fontSize = 10.sp,
                 textAlign = TextAlign.Center
             )
         }
@@ -334,9 +377,8 @@ private fun PlayingScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 10.dp, vertical = 6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.SpaceBetween
+            .padding(horizontal = 10.dp, vertical = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         // Horní stavová lišta
         Column(modifier = Modifier.fillMaxWidth()) {
@@ -349,7 +391,10 @@ private fun PlayingScreen(
                     text = "${engine.edition.shortTab} • KOLO ${engine.level}",
                     color = Color(0xFFFBBF24),
                     fontSize = 13.sp,
-                    fontWeight = FontWeight.ExtraBold
+                    fontWeight = FontWeight.ExtraBold,
+                    maxLines = 1,
+                    softWrap = false,
+                    modifier = Modifier.weight(1f)
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     SmallHudButton(text = if (soundOn) "🔊" else "🔇", onClick = onToggleSound)
@@ -368,41 +413,49 @@ private fun PlayingScreen(
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(8.dp))
                     .background(Color(0xFF1E293B))
-                    .padding(horizontal = 10.dp, vertical = 5.dp),
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "SKÓRE: ${engine.score}",
+                    text = "BODY: ${engine.score}",
                     color = Color.White,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    softWrap = false
                 )
                 Text(
                     text = "❤️ ${engine.lives}",
                     color = Color(0xFFF87171),
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    softWrap = false
                 )
                 Text(
                     text = "⏱ $timeStr",
                     color = if (engine.timeLeftSeconds <= 30) Color(0xFFEF4444) else Color(0xFF38BDF8),
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    softWrap = false
                 )
                 Text(
                     text = "💣${engine.maxBombs} 🔥${engine.fireRange}${if (engine.hasKick) " 👟" else ""}",
                     color = Color(0xFFA7F3D0),
                     fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    softWrap = false
                 )
             }
 
-            Spacer(modifier = Modifier.height(3.dp))
+            Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = engine.statusMessage,
                 color = Color(0xFFCBD5E1),
-                fontSize = 11.sp,
+                fontSize = 10.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.fillMaxWidth(),
@@ -410,16 +463,17 @@ private fun PlayingScreen(
             )
         }
 
-        // Střední herní plocha
+        // Střední herní plocha (automaticky se přizpůsobí volnému místu)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f, fill = false),
+                .weight(1f)
+                .padding(vertical = 4.dp),
             contentAlignment = Alignment.Center
         ) {
             BombManBoard(
                 engine = engine,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxSize()
             )
 
             if (engine.isVictoryBanner) {
@@ -428,21 +482,21 @@ private fun PlayingScreen(
                         .clip(RoundedCornerShape(12.dp))
                         .background(Color(0xEE0F172A))
                         .border(2.dp, Color(0xFF22C55E), RoundedCornerShape(12.dp))
-                        .padding(20.dp),
+                        .padding(18.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
                             text = "🎉 KOLO ${engine.level} DOKONČENO!",
                             color = Color(0xFF4ADE80),
-                            fontSize = 18.sp,
+                            fontSize = 16.sp,
                             fontWeight = FontWeight.ExtraBold
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
                             text = "Připrav se na další arénu...",
                             color = Color.White,
-                            fontSize = 13.sp
+                            fontSize = 12.sp
                         )
                     }
                 }
@@ -454,21 +508,21 @@ private fun PlayingScreen(
                         .clip(RoundedCornerShape(12.dp))
                         .background(Color(0xF00F172A))
                         .border(2.dp, Color(0xFFEF4444), RoundedCornerShape(12.dp))
-                        .padding(18.dp),
+                        .padding(16.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
                             text = "💥 KONEC HRY",
                             color = Color(0xFFF87171),
-                            fontSize = 20.sp,
+                            fontSize = 18.sp,
                             fontWeight = FontWeight.ExtraBold
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = "Nahrané skóre: ${engine.score}",
                             color = Color(0xFFFBBF24),
-                            fontSize = 15.sp,
+                            fontSize = 14.sp,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(10.dp))
@@ -477,13 +531,13 @@ private fun PlayingScreen(
                                 onClick = { engine.startNewGame(engine.edition, engine.difficulty) },
                                 colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF16A34A))
                             ) {
-                                Text("HRÁT ZNOVU", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                Text("HRÁT ZNOVU", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                             }
                             Button(
                                 onClick = onOpenLeaderboard,
                                 colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF2563EB))
                             ) {
-                                Text("REKORDY", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                Text("REKORDY", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -499,7 +553,7 @@ private fun PlayingScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 6.dp, vertical = 4.dp),
+                    .padding(horizontal = 8.dp, vertical = 2.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -508,7 +562,7 @@ private fun PlayingScreen(
                     DPadButton(label = "▲", onClick = { engine.movePlayer(Direction.UP) })
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         DPadButton(label = "◀", onClick = { engine.movePlayer(Direction.LEFT) })
-                        Spacer(modifier = Modifier.width(38.dp))
+                        Spacer(modifier = Modifier.width(34.dp))
                         DPadButton(label = "▶", onClick = { engine.movePlayer(Direction.RIGHT) })
                     }
                     DPadButton(label = "▼", onClick = { engine.movePlayer(Direction.DOWN) })
@@ -517,7 +571,7 @@ private fun PlayingScreen(
                 // Tlačítko pro položení bomby
                 Box(
                     modifier = Modifier
-                        .size(104.dp)
+                        .size(96.dp)
                         .clip(CircleShape)
                         .background(Color(0xFFDC2626))
                         .border(4.dp, Color(0xFFFCA5A5), CircleShape)
@@ -525,12 +579,14 @@ private fun PlayingScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(text = "💣", fontSize = 26.sp)
+                        Text(text = "💣", fontSize = 24.sp)
                         Text(
                             text = "BOMBA",
                             color = Color.White,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.ExtraBold
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            maxLines = 1,
+                            softWrap = false
                         )
                     }
                 }
@@ -557,7 +613,14 @@ private fun SmallHudButton(text: String, onClick: () -> Unit) {
             .padding(horizontal = 8.dp, vertical = 4.dp),
         contentAlignment = Alignment.Center
     ) {
-        Text(text = text, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        Text(
+            text = text,
+            color = Color.White,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            softWrap = false
+        )
     }
 }
 
@@ -565,7 +628,7 @@ private fun SmallHudButton(text: String, onClick: () -> Unit) {
 private fun DPadButton(label: String, onClick: () -> Unit) {
     Box(
         modifier = Modifier
-            .size(50.dp)
+            .size(46.dp)
             .clip(RoundedCornerShape(10.dp))
             .background(Color(0xFF1E293B))
             .border(1.5.dp, Color(0xFF475569), RoundedCornerShape(10.dp))
@@ -575,7 +638,7 @@ private fun DPadButton(label: String, onClick: () -> Unit) {
         Text(
             text = label,
             color = Color.White,
-            fontSize = 20.sp,
+            fontSize = 18.sp,
             fontWeight = FontWeight.Bold
         )
     }
@@ -632,6 +695,8 @@ private fun LeaderboardScreen(
                     color = Color(0xFFFBBF24),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.ExtraBold,
+                    maxLines = 1,
+                    softWrap = false,
                     modifier = Modifier.weight(1f)
                 )
                 Box(
@@ -645,7 +710,9 @@ private fun LeaderboardScreen(
                         text = "OBNOVIT",
                         color = Color.White,
                         fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        softWrap = false
                     )
                 }
             }
@@ -672,7 +739,9 @@ private fun LeaderboardScreen(
                             text = ed.shortTab,
                             color = if (selected) Color(0xFF0F172A) else Color.White,
                             fontSize = 10.sp,
-                            fontWeight = FontWeight.ExtraBold
+                            fontWeight = FontWeight.ExtraBold,
+                            maxLines = 1,
+                            softWrap = false
                         )
                     }
                 }
@@ -747,7 +816,9 @@ private fun LeaderboardScreen(
                                 text = "ULOŽIT",
                                 color = Color.White,
                                 fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                softWrap = false
                             )
                         }
                     }
@@ -777,7 +848,9 @@ private fun LeaderboardScreen(
                         text = "OSOBNÍ: $localBest",
                         color = Color(0xFFFBBF24),
                         fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        softWrap = false
                     )
                 }
             }
@@ -843,7 +916,9 @@ private fun LeaderboardScreen(
                                     text = "${item.score} b.",
                                     color = Color(0xFF38BDF8),
                                     fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    softWrap = false
                                 )
                             }
                         }
