@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Telo bomby -->
+    <path
+        android:fillColor="#11151C"
+        android:pathData="M54,36A24,24 0,1 1,54 84A24,24 0,1 1,54 36Z" />
+    <!-- Odlesk na bombe -->
+    <path
+        android:fillColor="#3D4B63"
+        android:pathData="M43,45A7,7 0,1 1,43 59A7,7 0,1 1,43 45Z" />
+    <!-- Hrdlo bomby -->
+    <path
+        android:fillColor="#4A5568"
+        android:pathData="M48,30h12v8h-12z" />
+    <!-- Knot -->
+    <path
+        android:strokeColor="#ECC94B"
+        android:strokeWidth="3.5"
+        android:strokeLineCap="round"
+        android:pathData="M54,30 Q62,21 70,24" />
+    <!-- Jiskra plamene -->
+    <path
+        android:fillColor="#FF5722"
+        android:pathData="M72,16 L75,22 L81,24 L75,27 L72,33 L69,27 L63,24 L69,22 Z" />
+    <path
+        android:fillColor="#FFEB3B"
+        android:pathData="M72,20 L74,23 L77,24 L74,26 L72,29 L70,26 L67,24 L70,23 Z" />
+</vector>
