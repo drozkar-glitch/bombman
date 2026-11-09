@@ -8,18 +8,13 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -45,9 +40,8 @@ fun BombManBoard(
             modifier = Modifier
                 .width(boardW)
                 .height(boardH)
-                .clip(RoundedCornerShape(8.dp))
-                .border(2.dp, Color(0xFF334155), RoundedCornerShape(8.dp))
-                .background(Color(0xFF0F172A))
+                .border(2.dp, Color(0xFF888888))
+                .background(Color(0xFF000000))
         ) {
             Canvas(modifier = Modifier.fillMaxSize()) {
                 if (tick < 0) return@Canvas
@@ -55,69 +49,97 @@ fun BombManBoard(
                 val cw = size.width / engine.gridWidth
                 val ch = size.height / engine.gridHeight
 
-                // 1. Podlaha a zdi
+                // 1. Podlaha + stíny pod zdmi (přesně jako v DOS Dyna Blasteru)
+                for (gx in 0 until engine.gridWidth) {
+                    for (gy in 0 until engine.gridHeight) {
+                        val left = gx * cw
+                        val top = gy * ch
+                        val hasWallAbove = gy > 0 && engine.getTile(gx, gy - 1) != TileType.EMPTY
+                        drawRetroFloor(engine.edition, gx, gy, left, top, cw, ch, hasWallAbove)
+                    }
+                }
+
+                // 2. Nerozbitné pilíře, cihlové zdi, dveře a bonusy
                 for (gx in 0 until engine.gridWidth) {
                     for (gy in 0 until engine.gridHeight) {
                         val left = gx * cw
                         val top = gy * ch
 
-                        drawFloorTile(engine.edition, gx, gy, left, top, cw, ch)
-
                         when (engine.getTile(gx, gy)) {
-                            TileType.HARD_WALL -> drawHardWall(engine.edition, gx, gy, left, top, cw, ch)
-                            TileType.SOFT_WALL -> drawSoftWall(engine.edition, left, top, cw, ch)
+                            TileType.HARD_WALL -> drawRetroHardWall(engine.edition, gx, gy, engine.gridWidth, engine.gridHeight, left, top, cw, ch)
+                            TileType.SOFT_WALL -> drawRetroSoftWall(engine.edition, left, top, cw, ch, 0)
                             TileType.EMPTY -> {
                                 if (engine.exitRevealed && gx == engine.exitX && gy == engine.exitY) {
                                     val allDead = engine.enemies.none { it.alive }
-                                    drawExitPortal(engine.edition, left, top, cw, ch, allDead, tick)
+                                    drawRetroExitDoor(engine.edition, left, top, cw, ch, allDead, tick)
                                 }
                                 val pu = engine.getVisiblePowerUp(gx, gy)
                                 if (pu != PowerUpType.NONE) {
-                                    drawPowerUpItem(pu, left, top, cw, ch, tick)
+                                    drawRetroPowerUp(pu, left, top, cw, ch, tick)
                                 }
                             }
                         }
                     }
                 }
 
-                // 2. Položené bomby
+                // 3. Rozpadající se cihlové zdi po zásahu plamenem
+                for (cr in engine.crumblingWalls) {
+                    val phase = (10 - cr.ticksLeft).coerceIn(1, 3)
+                    drawRetroSoftWall(engine.edition, cr.x * cw, cr.y * ch, cw, ch, phase)
+                }
+
+                // 4. Položené dýchající pixelové bomby
                 for (b in engine.bombs) {
-                    drawBomb(b.x * cw, b.y * ch, cw, ch, b.ticksLeft)
+                    drawRetroBomb(b.x * cw, b.y * ch, cw, ch, b.ticksLeft)
                 }
 
-                // 3. Plameny výbuchů
+                // 5. Spojené křížové plameny výbuchu
                 for (f in engine.flames) {
-                    drawFlame(f.x * cw, f.y * ch, cw, ch, f.ticksLeft)
+                    drawRetroFlame(f.x * cw, f.y * ch, cw, ch, f.shape, f.ticksLeft)
                 }
 
-                // 4. Nepřátelé a AI Bomberman soupeři
+                // 6. Nepřátelé (plynulá sub-pixelová pozice)
                 for (e in engine.enemies) {
-                    if (e.alive) {
-                        drawEnemy(e, e.x * cw, e.y * ch, cw, ch, tick)
+                    if (e.alive || e.dyingTicks > 0) {
+                        drawRetroEnemy(e, e.posX * cw, e.posY * ch, cw, ch, tick)
                     }
                 }
 
-                // 5. Hráč
+                // 7. Hráč (plynulá sub-pixelová pozice + animace chůze nebo smrti)
                 if (!engine.isGameOver) {
-                    val blinkHide = engine.playerInvulnerableTicks > 0 && (engine.playerInvulnerableTicks % 4 < 2)
-                    if (!blinkHide) {
-                        if (engine.edition == GameEdition.BOMBIC) {
-                            drawWormPlayer(engine.playerX * cw, engine.playerY * ch, cw, ch, engine.playerFacing)
-                        } else {
-                            val suitColor = when (engine.edition) {
-                                GameEdition.DYNA -> Color(0xFF2563EB)
-                                GameEdition.ATOMIC -> Color(0xFF10B981)
-                                GameEdition.MRBOOM -> Color(0xFF8B5CF6)
-                                GameEdition.BOMBIC -> Color(0xFF2563EB)
+                    if (engine.playerDyingTicks > 0) {
+                        drawDyingBomberman(engine.playerPosX * cw, engine.playerPosY * ch, cw, ch, engine.playerDyingTicks)
+                    } else {
+                        val blinkHide = engine.playerInvulnerableTicks > 0 && (engine.playerInvulnerableTicks % 4 < 2)
+                        if (!blinkHide) {
+                            if (engine.edition == GameEdition.BOMBIC) {
+                                drawRetroWorm(
+                                    left = engine.playerPosX * cw,
+                                    top = engine.playerPosY * ch,
+                                    cw = cw,
+                                    ch = ch,
+                                    facing = engine.playerFacing,
+                                    walkFrame = engine.playerWalkFrame
+                                )
+                            } else {
+                                val suitCol = when (engine.edition) {
+                                    GameEdition.DYNA -> Color(0xFF0058F8)
+                                    GameEdition.ATOMIC -> Color(0xFF00A844)
+                                    GameEdition.MRBOOM -> Color(0xFF9838FC)
+                                    GameEdition.BOMBIC -> Color(0xFF0058F8)
+                                }
+                                drawPixelBomberman(
+                                    left = engine.playerPosX * cw,
+                                    top = engine.playerPosY * ch,
+                                    cw = cw,
+                                    ch = ch,
+                                    helmetColor = Color(0xFFF8F8F8),
+                                    suitColor = suitCol,
+                                    facing = engine.playerFacing,
+                                    walkFrame = engine.playerWalkFrame,
+                                    isMoving = engine.heldDirection != Direction.NONE
+                                )
                             }
-                            drawBomberCharacter(
-                                left = engine.playerX * cw,
-                                top = engine.playerY * ch,
-                                cw = cw,
-                                ch = ch,
-                                helmetColor = Color.White,
-                                suitColor = suitColor
-                            )
                         }
                     }
                 }
@@ -126,119 +148,168 @@ fun BombManBoard(
     }
 }
 
-private fun DrawScope.drawFloorTile(
+private fun DrawScope.pxRect(
+    left: Float,
+    top: Float,
+    cw: Float,
+    ch: Float,
+    gx: Int,
+    gy: Int,
+    gw: Int,
+    gh: Int,
+    color: Color
+) {
+    val ux = cw / 16f
+    val uy = ch / 16f
+    drawRect(
+        color = color,
+        topLeft = Offset(left + gx * ux, top + gy * uy),
+        size = Size(gw * ux + 0.4f, gh * uy + 0.4f)
+    )
+}
+
+private fun DrawScope.drawRetroFloor(
     edition: GameEdition,
     gx: Int,
     gy: Int,
     left: Float,
     top: Float,
     cw: Float,
-    ch: Float
+    ch: Float,
+    hasWallAbove: Boolean
 ) {
-    val isEven = (gx + gy) % 2 == 0
-    val color = when (edition) {
-        GameEdition.DYNA -> if (isEven) Color(0xFF1E5631) else Color(0xFF194A2A)
-        GameEdition.BOMBIC -> if (isEven) Color(0xFF3F6212) else Color(0xFF365314)
-        GameEdition.ATOMIC -> if (isEven) Color(0xFF1E293B) else Color(0xFF172033)
-        GameEdition.MRBOOM -> if (isEven) Color(0xFF2E1065) else Color(0xFF240B52)
+    val baseGreen = when (edition) {
+        GameEdition.DYNA -> Color(0xFF187818)
+        GameEdition.BOMBIC -> Color(0xFF287010)
+        GameEdition.ATOMIC -> Color(0xFF245848)
+        GameEdition.MRBOOM -> Color(0xFF205068)
     }
-    drawRect(color = color, topLeft = Offset(left, top), size = Size(cw + 0.5f, ch + 0.5f))
+    val shadowGreen = when (edition) {
+        GameEdition.DYNA -> Color(0xFF0C480C)
+        GameEdition.BOMBIC -> Color(0xFF184808)
+        GameEdition.ATOMIC -> Color(0xFF143428)
+        GameEdition.MRBOOM -> Color(0xFF102C3C)
+    }
+    drawRect(color = baseGreen, topLeft = Offset(left, top), size = Size(cw + 0.6f, ch + 0.6f))
+    if (hasWallAbove && gx in 1..13 && gy in 1..9) {
+        drawRect(color = shadowGreen, topLeft = Offset(left, top), size = Size(cw + 0.6f, ch * 0.22f))
+    }
 }
 
-private fun DrawScope.drawHardWall(
+private fun DrawScope.drawRetroHardWall(
     edition: GameEdition,
     gx: Int,
     gy: Int,
+    gridW: Int,
+    gridH: Int,
     left: Float,
     top: Float,
     cw: Float,
     ch: Float
 ) {
-    when (edition) {
-        GameEdition.BOMBIC -> {
-            drawRect(color = Color(0xFF475569), topLeft = Offset(left, top), size = Size(cw, ch))
-            drawRoundRect(
-                color = Color(0xFF94A3B8),
-                topLeft = Offset(left + cw * 0.08f, top + ch * 0.08f),
-                size = Size(cw * 0.84f, ch * 0.84f),
-                cornerRadius = CornerRadius(cw * 0.28f, ch * 0.28f)
-            )
-            drawCircle(
-                color = Color(0xFFCBD5E1),
-                radius = cw * 0.16f,
-                center = Offset(left + cw * 0.35f, top + ch * 0.35f)
-            )
-        }
-        else -> {
-            val baseColor = if (gx == 0 || gy == 0) Color(0xFF475569) else Color(0xFF64748B)
-            drawRect(color = baseColor, topLeft = Offset(left, top), size = Size(cw, ch))
-            drawRect(
-                color = Color(0xFF94A3B8),
-                topLeft = Offset(left + cw * 0.1f, top + ch * 0.1f),
-                size = Size(cw * 0.8f, ch * 0.8f)
-            )
-            drawRect(
-                color = Color(0xFF1E293B),
-                topLeft = Offset(left, top),
-                size = Size(cw, ch),
-                style = Stroke(width = 1.5f)
-            )
-            val r = cw * 0.06f
-            drawCircle(Color(0xFF334155), r, Offset(left + cw * 0.2f, top + ch * 0.2f))
-            drawCircle(Color(0xFF334155), r, Offset(left + cw * 0.8f, top + ch * 0.2f))
-            drawCircle(Color(0xFF334155), r, Offset(left + cw * 0.2f, top + ch * 0.8f))
-            drawCircle(Color(0xFF334155), r, Offset(left + cw * 0.8f, top + ch * 0.8f))
-        }
+    val isBorder = (gx == 0 || gy == 0 || gx == gridW - 1 || gy == gridH - 1)
+    if (edition == GameEdition.BOMBIC && !isBorder) {
+        // Kamenný balvan v zahradě
+        pxRect(left, top, cw, ch, 0, 0, 16, 16, Color(0xFF183008))
+        pxRect(left, top, cw, ch, 1, 1, 14, 14, Color(0xFF687078))
+        pxRect(left, top, cw, ch, 2, 2, 11, 11, Color(0xFF98A0A8))
+        pxRect(left, top, cw, ch, 3, 3, 6, 4, Color(0xFFD0D8E0))
+        return
+    }
+
+    // Klasický 3D zkosený ocelový kvádr z Dyna Blasteru
+    val darkEdge = Color(0xFF181818)
+    val shadowGray = Color(0xFF585858)
+    val midGray = if (isBorder) Color(0xFF888888) else Color(0xFFA0A0A0)
+    val lightGray = Color(0xFFE8E8E8)
+
+    pxRect(left, top, cw, ch, 0, 0, 16, 16, darkEdge)
+    pxRect(left, top, cw, ch, 1, 1, 14, 14, shadowGray)
+    pxRect(left, top, cw, ch, 1, 1, 13, 13, lightGray)
+    pxRect(left, top, cw, ch, 3, 3, 10, 10, midGray)
+
+    if (!isBorder) {
+        // 4 rohové nýty na vnitřních pilířích
+        pxRect(left, top, cw, ch, 4, 4, 2, 2, darkEdge)
+        pxRect(left, top, cw, ch, 10, 4, 2, 2, darkEdge)
+        pxRect(left, top, cw, ch, 4, 10, 2, 2, darkEdge)
+        pxRect(left, top, cw, ch, 10, 10, 2, 2, darkEdge)
     }
 }
 
-private fun DrawScope.drawSoftWall(
+private fun DrawScope.drawRetroSoftWall(
     edition: GameEdition,
     left: Float,
     top: Float,
     cw: Float,
-    ch: Float
+    ch: Float,
+    crumblePhase: Int
 ) {
-    when (edition) {
-        GameEdition.BOMBIC -> {
-            drawRoundRect(
-                color = Color(0xFF15803D),
-                topLeft = Offset(left + cw * 0.06f, top + ch * 0.06f),
-                size = Size(cw * 0.88f, ch * 0.88f),
-                cornerRadius = CornerRadius(cw * 0.25f, ch * 0.25f)
-            )
-            drawCircle(Color(0xFF22C55E), cw * 0.24f, Offset(left + cw * 0.35f, top + ch * 0.38f))
-            drawCircle(Color(0xFF22C55E), cw * 0.22f, Offset(left + cw * 0.65f, top + ch * 0.42f))
-            drawCircle(Color(0xFF4ADE80), cw * 0.18f, Offset(left + cw * 0.50f, top + ch * 0.62f))
-        }
-        GameEdition.ATOMIC -> {
-            drawRect(Color(0xFFB45309), Offset(left + 1f, top + 1f), Size(cw - 2f, ch - 2f))
-            drawRect(Color(0xFFF59E0B), Offset(left + cw * 0.12f, top + ch * 0.12f), Size(cw * 0.76f, ch * 0.76f))
-            drawLine(
-                color = Color(0xFF78350F),
-                start = Offset(left + cw * 0.15f, top + ch * 0.15f),
-                end = Offset(left + cw * 0.85f, top + ch * 0.85f),
-                strokeWidth = 3f
-            )
-            drawLine(
-                color = Color(0xFF78350F),
-                start = Offset(left + cw * 0.85f, top + ch * 0.15f),
-                end = Offset(left + cw * 0.15f, top + ch * 0.85f),
-                strokeWidth = 3f
-            )
-        }
-        else -> {
-            drawRect(Color(0xFFB91C1C), Offset(left + 1f, top + 1f), Size(cw - 2f, ch - 2f))
-            val mortar = Color(0xFFE2E8F0)
-            drawLine(mortar, Offset(left, top + ch * 0.5f), Offset(left + cw, top + ch * 0.5f), strokeWidth = 2f)
-            drawLine(mortar, Offset(left + cw * 0.5f, top), Offset(left + cw * 0.5f, top + ch * 0.5f), strokeWidth = 2f)
-            drawLine(mortar, Offset(left + cw * 0.25f, top + ch * 0.5f), Offset(left + cw * 0.25f, top + ch), strokeWidth = 2f)
-            drawLine(mortar, Offset(left + cw * 0.75f, top + ch * 0.5f), Offset(left + cw * 0.75f, top + ch), strokeWidth = 2f)
-        }
+    if (crumblePhase > 0) {
+        // Rozpadající se hořící cihla
+        val fireCol = if (crumblePhase % 2 == 1) Color(0xFFF85800) else Color(0xFFF8B800)
+        val ashCol = Color(0xFF582000)
+        pxRect(left, top, cw, ch, 2, 2, 5, 4, fireCol)
+        pxRect(left, top, cw, ch, 9, 3, 5, 4, ashCol)
+        pxRect(left, top, cw, ch, 4, 9, 6, 4, fireCol)
+        pxRect(left, top, cw, ch, 1, 11, 4, 3, ashCol)
+        return
     }
+
+    if (edition == GameEdition.BOMBIC) {
+        // Zelený keř v Bombíčovi
+        pxRect(left, top, cw, ch, 0, 0, 16, 16, Color(0xFF0C3808))
+        pxRect(left, top, cw, ch, 1, 1, 14, 14, Color(0xFF187818))
+        pxRect(left, top, cw, ch, 2, 2, 5, 5, Color(0xFF48C828))
+        pxRect(left, top, cw, ch, 8, 3, 5, 5, Color(0xFF48C828))
+        pxRect(left, top, cw, ch, 4, 8, 6, 5, Color(0xFF38A820))
+        return
+    }
+
+    // Klasická cihlová zeď z Dyna Blasteru (4 řady cihel se světlou maltou a stínem)
+    val mortar = Color(0xFFD8B890)
+    val brickMain = if (edition == GameEdition.DYNA) Color(0xFFA83808) else Color(0xFFB85010)
+    val brickDark = Color(0xFF581800)
+    val brickHi = Color(0xFFD86828)
+
+    pxRect(left, top, cw, ch, 0, 0, 16, 16, brickDark)
+
+    // Řada 1
+    pxRect(left, top, cw, ch, 0, 0, 7, 3, brickMain)
+    pxRect(left, top, cw, ch, 0, 0, 6, 1, brickHi)
+    pxRect(left, top, cw, ch, 8, 0, 8, 3, brickMain)
+    pxRect(left, top, cw, ch, 8, 0, 7, 1, brickHi)
+    pxRect(left, top, cw, ch, 7, 0, 1, 3, mortar)
+    pxRect(left, top, cw, ch, 0, 3, 16, 1, mortar)
+
+    // Řada 2
+    pxRect(left, top, cw, ch, 0, 4, 3, 3, brickMain)
+    pxRect(left, top, cw, ch, 4, 4, 8, 3, brickMain)
+    pxRect(left, top, cw, ch, 4, 4, 7, 1, brickHi)
+    pxRect(left, top, cw, ch, 13, 4, 3, 3, brickMain)
+    pxRect(left, top, cw, ch, 3, 4, 1, 3, mortar)
+    pxRect(left, top, cw, ch, 12, 4, 1, 3, mortar)
+    pxRect(left, top, cw, ch, 0, 7, 16, 1, mortar)
+
+    // Řada 3
+    pxRect(left, top, cw, ch, 0, 8, 7, 3, brickMain)
+    pxRect(left, top, cw, ch, 0, 8, 6, 1, brickHi)
+    pxRect(left, top, cw, ch, 8, 8, 8, 3, brickMain)
+    pxRect(left, top, cw, ch, 8, 8, 7, 1, brickHi)
+    pxRect(left, top, cw, ch, 7, 8, 1, 3, mortar)
+    pxRect(left, top, cw, ch, 0, 11, 16, 1, mortar)
+
+    // Řada 4
+    pxRect(left, top, cw, ch, 0, 12, 3, 3, brickMain)
+    pxRect(left, top, cw, ch, 4, 12, 8, 3, brickMain)
+    pxRect(left, top, cw, ch, 4, 12, 7, 1, brickHi)
+    pxRect(left, top, cw, ch, 13, 12, 3, 3, brickMain)
+    pxRect(left, top, cw, ch, 3, 12, 1, 3, mortar)
+    pxRect(left, top, cw, ch, 12, 12, 1, 3, mortar)
+    pxRect(left, top, cw, ch, 0, 15, 16, 1, mortar)
 }
 
-private fun DrawScope.drawExitPortal(
+private fun DrawScope.drawRetroExitDoor(
     edition: GameEdition,
     left: Float,
     top: Float,
@@ -247,35 +318,20 @@ private fun DrawScope.drawExitPortal(
     unlocked: Boolean,
     tick: Int
 ) {
-    val glow = if (unlocked && tick % 6 < 3) Color(0xFF22C55E) else Color(0xFFFACC15)
+    val frameCol = if (unlocked && tick % 6 < 3) Color(0xFFF8D820) else Color(0xFFD88818)
+    val innerCol = if (unlocked) Color(0xFF28B838) else Color(0xFF583010)
     if (edition == GameEdition.BOMBIC) {
-        drawCircle(
-            color = glow,
-            radius = cw * 0.42f,
-            center = Offset(left + cw * 0.5f, top + ch * 0.5f)
-        )
-        drawCircle(
-            color = Color(0xFF1C1917),
-            radius = cw * 0.30f,
-            center = Offset(left + cw * 0.5f, top + ch * 0.5f)
-        )
+        pxRect(left, top, cw, ch, 2, 2, 12, 12, frameCol)
+        pxRect(left, top, cw, ch, 4, 4, 8, 8, Color(0xFF101010))
     } else {
-        drawRoundRect(
-            color = glow,
-            topLeft = Offset(left + cw * 0.14f, top + ch * 0.1f),
-            size = Size(cw * 0.72f, ch * 0.82f),
-            cornerRadius = CornerRadius(cw * 0.2f, ch * 0.2f)
-        )
-        drawRoundRect(
-            color = if (unlocked) Color(0xFF059669) else Color(0xFF475569),
-            topLeft = Offset(left + cw * 0.22f, top + ch * 0.18f),
-            size = Size(cw * 0.56f, ch * 0.68f),
-            cornerRadius = CornerRadius(cw * 0.12f, ch * 0.12f)
-        )
+        pxRect(left, top, cw, ch, 2, 1, 12, 14, Color(0xFF000000))
+        pxRect(left, top, cw, ch, 3, 2, 10, 12, frameCol)
+        pxRect(left, top, cw, ch, 5, 4, 6, 10, innerCol)
+        pxRect(left, top, cw, ch, 9, 8, 1, 2, Color(0xFFF8F8F8))
     }
 }
 
-private fun DrawScope.drawPowerUpItem(
+private fun DrawScope.drawRetroPowerUp(
     pu: PowerUpType,
     left: Float,
     top: Float,
@@ -283,152 +339,252 @@ private fun DrawScope.drawPowerUpItem(
     ch: Float,
     tick: Int
 ) {
-    val bgColor = when (pu) {
-        PowerUpType.EXTRA_BOMB -> Color(0xFF3B82F6)
-        PowerUpType.FIRE_UP -> Color(0xFFEF4444)
-        PowerUpType.SPEED_UP -> Color(0xFF10B981)
-        PowerUpType.KICK_BOMB -> Color(0xFFF59E0B)
-        PowerUpType.EXTRA_LIFE -> Color(0xFFEC4899)
+    val borderCol = if (tick % 6 < 3) Color(0xFFF8F8F8) else Color(0xFFF8B800)
+    val bgCol = when (pu) {
+        PowerUpType.EXTRA_BOMB -> Color(0xFF1858C8)
+        PowerUpType.FIRE_UP -> Color(0xFFD82800)
+        PowerUpType.SPEED_UP -> Color(0xFF009838)
+        PowerUpType.DETONATOR -> Color(0xFF8820B8)
+        PowerUpType.KICK_BOMB -> Color(0xFFD87800)
+        PowerUpType.WALL_PASS -> Color(0xFF785838)
+        PowerUpType.EXTRA_LIFE -> Color(0xFFD81868)
         PowerUpType.NONE -> Color.Transparent
     }
-    val pulse = if (tick % 8 < 4) 0.12f else 0.16f
-    drawRoundRect(
-        color = Color.White,
-        topLeft = Offset(left + cw * pulse, top + ch * pulse),
-        size = Size(cw * (1f - 2 * pulse), ch * (1f - 2 * pulse)),
-        cornerRadius = CornerRadius(cw * 0.2f, ch * 0.2f)
-    )
-    drawRoundRect(
-        color = bgColor,
-        topLeft = Offset(left + cw * (pulse + 0.05f), top + ch * (pulse + 0.05f)),
-        size = Size(cw * (0.9f - 2 * pulse), ch * (0.9f - 2 * pulse)),
-        cornerRadius = CornerRadius(cw * 0.16f, ch * 0.16f)
-    )
-    val cx = left + cw * 0.5f
-    val cy = top + ch * 0.5f
+
+    // Klasický čtvercový retro panel bonusu
+    pxRect(left, top, cw, ch, 1, 1, 14, 14, Color(0xFF000000))
+    pxRect(left, top, cw, ch, 2, 2, 12, 12, borderCol)
+    pxRect(left, top, cw, ch, 3, 3, 10, 10, bgCol)
+
     when (pu) {
-        PowerUpType.EXTRA_BOMB -> drawCircle(Color.Black, cw * 0.18f, Offset(cx, cy))
-        PowerUpType.FIRE_UP -> drawCircle(Color(0xFFFFEB3B), cw * 0.18f, Offset(cx, cy))
-        PowerUpType.SPEED_UP -> drawRect(Color.White, Offset(cx - cw * 0.16f, cy - ch * 0.08f), Size(cw * 0.32f, ch * 0.16f))
-        PowerUpType.KICK_BOMB -> drawCircle(Color.White, cw * 0.15f, Offset(cx, cy))
-        PowerUpType.EXTRA_LIFE -> drawCircle(Color.White, cw * 0.17f, Offset(cx, cy))
+        PowerUpType.EXTRA_BOMB -> {
+            pxRect(left, top, cw, ch, 5, 6, 6, 6, Color.Black)
+            pxRect(left, top, cw, ch, 6, 7, 2, 2, Color.White)
+            pxRect(left, top, cw, ch, 8, 4, 2, 2, Color(0xFFF8D800))
+        }
+        PowerUpType.FIRE_UP -> {
+            pxRect(left, top, cw, ch, 6, 4, 4, 8, Color(0xFFF8D800))
+            pxRect(left, top, cw, ch, 4, 6, 8, 4, Color(0xFFF8D800))
+            pxRect(left, top, cw, ch, 7, 6, 2, 4, Color.White)
+        }
+        PowerUpType.SPEED_UP -> {
+            // Kolečková brusle
+            pxRect(left, top, cw, ch, 5, 4, 4, 5, Color.White)
+            pxRect(left, top, cw, ch, 5, 8, 7, 2, Color.White)
+            pxRect(left, top, cw, ch, 5, 10, 2, 2, Color(0xFFF8D800))
+            pxRect(left, top, cw, ch, 10, 10, 2, 2, Color(0xFFF8D800))
+        }
+        PowerUpType.DETONATOR -> {
+            // Krabička s pákou odpálovače (Tlačítko B)
+            pxRect(left, top, cw, ch, 5, 7, 6, 5, Color(0xFFE0E0E0))
+            pxRect(left, top, cw, ch, 7, 5, 2, 2, Color(0xFFE0E0E0))
+            pxRect(left, top, cw, ch, 5, 4, 6, 1, Color(0xFFF83800))
+        }
+        PowerUpType.KICK_BOMB -> {
+            // Bota
+            pxRect(left, top, cw, ch, 5, 5, 4, 6, Color.White)
+            pxRect(left, top, cw, ch, 5, 9, 7, 3, Color.White)
+        }
+        PowerUpType.WALL_PASS -> {
+            pxRect(left, top, cw, ch, 4, 5, 8, 6, Color(0xFFF8B880))
+            pxRect(left, top, cw, ch, 6, 7, 4, 4, Color.White)
+        }
+        PowerUpType.EXTRA_LIFE -> {
+            pxRect(left, top, cw, ch, 4, 5, 3, 3, Color.White)
+            pxRect(left, top, cw, ch, 9, 5, 3, 3, Color.White)
+            pxRect(left, top, cw, ch, 5, 8, 6, 3, Color.White)
+            pxRect(left, top, cw, ch, 7, 11, 2, 1, Color.White)
+        }
         PowerUpType.NONE -> {}
     }
 }
 
-private fun DrawScope.drawBomb(
+private fun DrawScope.drawRetroBomb(
     left: Float,
     top: Float,
     cw: Float,
     ch: Float,
     ticksLeft: Int
 ) {
-    val cx = left + cw * 0.5f
-    val cy = top + ch * 0.54f
-    val pulse = if (ticksLeft % 6 < 3) 0.38f else 0.34f
+    // Bomba v Dyna Blasteru pulzuje (dýchá) ve 3 velikostech
+    val big = (ticksLeft / 4) % 2 == 0
+    val bodyCol = if (ticksLeft <= 10 && ticksLeft % 2 == 0) Color(0xFFD82800) else Color(0xFF101820)
+    val shineCol = Color(0xFFF8F8F8)
 
-    drawCircle(
-        color = if (ticksLeft <= 12 && ticksLeft % 2 == 0) Color(0xFFDC2626) else Color(0xFF0F172A),
-        radius = cw * pulse,
-        center = Offset(cx, cy)
-    )
-    drawCircle(
-        color = Color(0xFF64748B),
-        radius = cw * 0.10f,
-        center = Offset(cx - cw * 0.12f, cy - ch * 0.12f)
-    )
-    drawLine(
-        color = Color(0xFFFBBF24),
-        start = Offset(cx, cy - ch * 0.32f),
-        end = Offset(cx + cw * 0.18f, top + ch * 0.12f),
-        strokeWidth = 3f
-    )
-    val sparkColor = if (ticksLeft % 2 == 0) Color(0xFFFF5722) else Color(0xFFFFEB3B)
-    drawCircle(
-        color = sparkColor,
-        radius = cw * 0.11f,
-        center = Offset(cx + cw * 0.18f, top + ch * 0.12f)
-    )
+    if (big) {
+        pxRect(left, top, cw, ch, 4, 4, 8, 10, bodyCol)
+        pxRect(left, top, cw, ch, 3, 5, 10, 8, bodyCol)
+        pxRect(left, top, cw, ch, 2, 6, 12, 6, bodyCol)
+        pxRect(left, top, cw, ch, 5, 6, 2, 3, shineCol)
+        pxRect(left, top, cw, ch, 4, 7, 1, 2, shineCol)
+    } else {
+        pxRect(left, top, cw, ch, 5, 5, 6, 8, bodyCol)
+        pxRect(left, top, cw, ch, 4, 6, 8, 6, bodyCol)
+        pxRect(left, top, cw, ch, 3, 7, 10, 4, bodyCol)
+        pxRect(left, top, cw, ch, 5, 7, 2, 2, shineCol)
+    }
+
+    // Hrdlo a prskající zápalná šňůra
+    pxRect(left, top, cw, ch, 7, 3, 2, 2, Color(0xFF787878))
+    pxRect(left, top, cw, ch, 8, 2, 2, 1, Color(0xFFD8A040))
+    val sparkCol = if (ticksLeft % 2 == 0) Color(0xFFF8F800) else Color(0xFFF83800)
+    pxRect(left, top, cw, ch, 10, 1, 3, 2, sparkCol)
 }
 
-private fun DrawScope.drawFlame(
+private fun DrawScope.drawRetroFlame(
     left: Float,
     top: Float,
     cw: Float,
     ch: Float,
+    shape: FlameShape,
     ticksLeft: Int
 ) {
-    val outer = if (ticksLeft % 2 == 0) Color(0xFFFF5722) else Color(0xFFEF4444)
-    val inner = Color(0xFFFFEB3B)
+    // 3vrstvý propojený plamen (červený okraj -> oranžovo-žlutý střed -> bílý žár uvnitř)
+    val flash = ticksLeft % 2 == 0
+    val outer = if (flash) Color(0xFFD82800) else Color(0xFFF85800)
+    val mid = if (flash) Color(0xFFF8B800) else Color(0xFFF8D820)
+    val core = Color(0xFFF8F8D8)
 
-    drawRoundRect(
-        color = outer,
-        topLeft = Offset(left + cw * 0.06f, top + ch * 0.06f),
-        size = Size(cw * 0.88f, ch * 0.88f),
-        cornerRadius = CornerRadius(cw * 0.25f, ch * 0.25f)
-    )
-    drawRoundRect(
-        color = inner,
-        topLeft = Offset(left + cw * 0.22f, top + ch * 0.22f),
-        size = Size(cw * 0.56f, ch * 0.56f),
-        cornerRadius = CornerRadius(cw * 0.18f, ch * 0.18f)
-    )
+    when (shape) {
+        FlameShape.CENTER -> {
+            pxRect(left, top, cw, ch, 0, 2, 16, 12, outer)
+            pxRect(left, top, cw, ch, 2, 0, 12, 16, outer)
+            pxRect(left, top, cw, ch, 0, 4, 16, 8, mid)
+            pxRect(left, top, cw, ch, 4, 0, 8, 16, mid)
+            pxRect(left, top, cw, ch, 0, 6, 16, 4, core)
+            pxRect(left, top, cw, ch, 6, 0, 4, 16, core)
+        }
+        FlameShape.HORIZ -> {
+            pxRect(left, top, cw, ch, 0, 2, 16, 12, outer)
+            pxRect(left, top, cw, ch, 0, 4, 16, 8, mid)
+            pxRect(left, top, cw, ch, 0, 6, 16, 4, core)
+        }
+        FlameShape.VERT -> {
+            pxRect(left, top, cw, ch, 2, 0, 12, 16, outer)
+            pxRect(left, top, cw, ch, 4, 0, 8, 16, mid)
+            pxRect(left, top, cw, ch, 6, 0, 4, 16, core)
+        }
+        FlameShape.END_LEFT -> {
+            pxRect(left, top, cw, ch, 4, 2, 12, 12, outer)
+            pxRect(left, top, cw, ch, 2, 4, 14, 8, outer)
+            pxRect(left, top, cw, ch, 4, 4, 12, 8, mid)
+            pxRect(left, top, cw, ch, 6, 6, 10, 4, core)
+        }
+        FlameShape.END_RIGHT -> {
+            pxRect(left, top, cw, ch, 0, 2, 12, 12, outer)
+            pxRect(left, top, cw, ch, 0, 4, 14, 8, outer)
+            pxRect(left, top, cw, ch, 0, 4, 12, 8, mid)
+            pxRect(left, top, cw, ch, 0, 6, 10, 4, core)
+        }
+        FlameShape.END_UP -> {
+            pxRect(left, top, cw, ch, 2, 4, 12, 12, outer)
+            pxRect(left, top, cw, ch, 4, 2, 8, 14, outer)
+            pxRect(left, top, cw, ch, 4, 4, 8, 12, mid)
+            pxRect(left, top, cw, ch, 6, 6, 4, 10, core)
+        }
+        FlameShape.END_DOWN -> {
+            pxRect(left, top, cw, ch, 2, 0, 12, 12, outer)
+            pxRect(left, top, cw, ch, 4, 0, 8, 14, outer)
+            pxRect(left, top, cw, ch, 4, 0, 8, 12, mid)
+            pxRect(left, top, cw, ch, 6, 0, 4, 10, core)
+        }
+    }
 }
 
-private fun DrawScope.drawBomberCharacter(
+private fun DrawScope.drawPixelBomberman(
     left: Float,
     top: Float,
     cw: Float,
     ch: Float,
     helmetColor: Color,
-    suitColor: Color
+    suitColor: Color,
+    facing: Direction,
+    walkFrame: Int,
+    isMoving: Boolean
 ) {
-    val cx = left + cw * 0.5f
-    drawRoundRect(
-        color = suitColor,
-        topLeft = Offset(left + cw * 0.26f, top + ch * 0.52f),
-        size = Size(cw * 0.48f, ch * 0.38f),
-        cornerRadius = CornerRadius(cw * 0.15f, ch * 0.15f)
-    )
-    drawCircle(
-        color = helmetColor,
-        radius = cw * 0.32f,
-        center = Offset(cx, top + ch * 0.38f)
-    )
-    drawCircle(
-        color = Color(0xFFEC4899),
-        radius = cw * 0.09f,
-        center = Offset(cx, top + ch * 0.09f)
-    )
-    drawRoundRect(
-        color = Color(0xFFFDE68A),
-        topLeft = Offset(left + cw * 0.28f, top + ch * 0.28f),
-        size = Size(cw * 0.44f, ch * 0.20f),
-        cornerRadius = CornerRadius(cw * 0.08f, ch * 0.08f)
-    )
-    drawCircle(Color.Black, cw * 0.045f, Offset(cx - cw * 0.10f, top + ch * 0.38f))
-    drawCircle(Color.Black, cw * 0.045f, Offset(cx + cw * 0.10f, top + ch * 0.38f))
+    val black = Color(0xFF080808)
+    val pink = Color(0xFFF85898)
+    val skin = Color(0xFFF8C890)
+    val gold = Color(0xFFF8D800)
+
+    // Růžová kulička anténky na helmě
+    pxRect(left, top, cw, ch, 7, 0, 2, 2, pink)
+
+    // Černý obrys helmy a bílá výplň
+    pxRect(left, top, cw, ch, 3, 2, 10, 7, black)
+    pxRect(left, top, cw, ch, 4, 3, 8, 5, helmetColor)
+
+    // Obličejový průzor a oči podle směru pohledu
+    if (facing != Direction.UP) {
+        val visorX = when (facing) {
+            Direction.LEFT -> 4
+            Direction.RIGHT -> 6
+            else -> 5
+        }
+        pxRect(left, top, cw, ch, visorX, 4, 6, 3, skin)
+        if (facing == Direction.LEFT) {
+            pxRect(left, top, cw, ch, 5, 5, 1, 2, black)
+            pxRect(left, top, cw, ch, 8, 5, 1, 2, black)
+        } else if (facing == Direction.RIGHT) {
+            pxRect(left, top, cw, ch, 7, 5, 1, 2, black)
+            pxRect(left, top, cw, ch, 10, 5, 1, 2, black)
+        } else {
+            pxRect(left, top, cw, ch, 6, 5, 1, 2, black)
+            pxRect(left, top, cw, ch, 9, 5, 1, 2, black)
+        }
+    }
+
+    // Trup s modrou vestou a černým opaskem se zlatou sponou
+    pxRect(left, top, cw, ch, 4, 9, 8, 4, suitColor)
+    pxRect(left, top, cw, ch, 4, 11, 8, 1, black)
+    pxRect(left, top, cw, ch, 7, 11, 2, 1, gold)
+
+    // Růžové ruce a animované boty při chůzi
+    val stepCycle = if (isMoving) (walkFrame / 3) % 2 else 0
+    val leftHandY = if (isMoving && stepCycle == 0) 9 else 10
+    val rightHandY = if (isMoving && stepCycle == 1) 9 else 10
+    pxRect(left, top, cw, ch, 2, leftHandY, 2, 2, pink)
+    pxRect(left, top, cw, ch, 12, rightHandY, 2, 2, pink)
+
+    val leftFootY = if (isMoving && stepCycle == 1) 12 else 13
+    val rightFootY = if (isMoving && stepCycle == 0) 12 else 13
+    pxRect(left, top, cw, ch, 4, leftFootY, 3, 3, pink)
+    pxRect(left, top, cw, ch, 9, rightFootY, 3, 3, pink)
 }
 
-private fun DrawScope.drawWormPlayer(
+private fun DrawScope.drawDyingBomberman(
     left: Float,
     top: Float,
     cw: Float,
     ch: Float,
-    facing: Direction
+    dyingTicks: Int
 ) {
-    val cx = left + cw * 0.5f
-    val cy = top + ch * 0.55f
-    drawCircle(Color(0xFFF472B6), cw * 0.22f, Offset(cx - facing.dx * cw * 0.16f, cy + ch * 0.14f))
-    drawCircle(Color(0xFFFBBF24), cw * 0.28f, Offset(cx, cy))
-    drawCircle(Color(0xFFFDE047), cw * 0.30f, Offset(cx, top + ch * 0.36f))
-    drawCircle(Color.White, cw * 0.11f, Offset(cx - cw * 0.11f, top + ch * 0.32f))
-    drawCircle(Color.White, cw * 0.11f, Offset(cx + cw * 0.11f, top + ch * 0.32f))
-    drawCircle(Color.Black, cw * 0.055f, Offset(cx - cw * 0.10f, top + ch * 0.32f))
-    drawCircle(Color.Black, cw * 0.055f, Offset(cx + cw * 0.10f, top + ch * 0.32f))
+    // Klasická animace nafouknutí a rozplynutí po zásahu plamenem
+    val col = if (dyingTicks % 2 == 0) Color(0xFFF85800) else Color(0xFFF8F8F8)
+    pxRect(left, top, cw, ch, 3, 3, 10, 10, col)
+    pxRect(left, top, cw, ch, 5, 5, 2, 3, Color.Black)
+    pxRect(left, top, cw, ch, 9, 5, 2, 3, Color.Black)
+    pxRect(left, top, cw, ch, 6, 10, 4, 2, Color.Black)
 }
 
-private fun DrawScope.drawEnemy(
+private fun DrawScope.drawRetroWorm(
+    left: Float,
+    top: Float,
+    cw: Float,
+    ch: Float,
+    facing: Direction,
+    walkFrame: Int
+) {
+    val wiggle = if ((walkFrame / 3) % 2 == 0) 0 else 1
+    pxRect(left, top, cw, ch, 4 - facing.dx * 2, 9 + wiggle, 8, 5, Color(0xFFE868A8))
+    pxRect(left, top, cw, ch, 3, 4, 10, 8, Color(0xFFF8C820))
+    pxRect(left, top, cw, ch, 5, 5, 2, 3, Color.White)
+    pxRect(left, top, cw, ch, 9, 5, 2, 3, Color.White)
+    pxRect(left, top, cw, ch, 6, 6, 1, 2, Color.Black)
+    pxRect(left, top, cw, ch, 10, 6, 1, 2, Color.Black)
+}
+
+private fun DrawScope.drawRetroEnemy(
     enemy: EnemyActor,
     left: Float,
     top: Float,
@@ -436,45 +592,72 @@ private fun DrawScope.drawEnemy(
     ch: Float,
     tick: Int
 ) {
+    if (!enemy.alive && enemy.dyingTicks > 0) {
+        val flash = if (enemy.dyingTicks % 2 == 0) Color(0xFFF8D800) else Color(0xFFF83800)
+        pxRect(left, top, cw, ch, 3, 3, 10, 10, flash)
+        return
+    }
+
+    val bob = if (tick % 8 < 4) 0 else 1
+
     when (enemy.kind) {
-        EnemyKind.RIVAL_RED -> drawBomberCharacter(left, top, cw, ch, Color(0xFFEF4444), Color(0xFF7F1D1D))
-        EnemyKind.RIVAL_BLUE -> drawBomberCharacter(left, top, cw, ch, Color(0xFF38BDF8), Color(0xFF0C4A6E))
-        EnemyKind.RIVAL_GOLD -> drawBomberCharacter(left, top, cw, ch, Color(0xFFFACC15), Color(0xFF713F12))
+        EnemyKind.RIVAL_RED -> drawPixelBomberman(left, top, cw, ch, Color(0xFFF83800), Color(0xFF880000), enemy.dir, tick, true)
+        EnemyKind.RIVAL_BLUE -> drawPixelBomberman(left, top, cw, ch, Color(0xFF38B8F8), Color(0xFF003888), enemy.dir, tick, true)
+        EnemyKind.RIVAL_GOLD -> drawPixelBomberman(left, top, cw, ch, Color(0xFFF8D800), Color(0xFF785800), enemy.dir, tick, true)
+
         EnemyKind.BALLOON -> {
-            val bounce = if (tick % 6 < 3) -ch * 0.03f else ch * 0.03f
-            val cx = left + cw * 0.5f
-            val cy = top + ch * 0.48f + bounce
-            drawCircle(Color(0xFFF97316), cw * 0.36f, Offset(cx, cy))
-            drawCircle(Color.White, cw * 0.09f, Offset(cx - cw * 0.12f, cy - ch * 0.06f))
-            drawCircle(Color.White, cw * 0.09f, Offset(cx + cw * 0.12f, cy - ch * 0.06f))
-            drawCircle(Color.Black, cw * 0.045f, Offset(cx - cw * 0.12f, cy - ch * 0.06f))
-            drawCircle(Color.Black, cw * 0.045f, Offset(cx + cw * 0.12f, cy - ch * 0.06f))
+            // Ikonický oranžový balónek Ballom z 1. levelu Dyna Blasteru
+            val orange = Color(0xFFF86818)
+            val hi = Color(0xFFF8B880)
+            pxRect(left, top, cw, ch, 4, 1 + bob, 8, 11, orange)
+            pxRect(left, top, cw, ch, 2, 3 + bob, 12, 8, orange)
+            pxRect(left, top, cw, ch, 4, 3 + bob, 2, 2, hi)
+            pxRect(left, top, cw, ch, 5, 5 + bob, 2, 3, Color.White)
+            pxRect(left, top, cw, ch, 9, 5 + bob, 2, 3, Color.White)
+            pxRect(left, top, cw, ch, 6, 6 + bob, 1, 2, Color.Black)
+            pxRect(left, top, cw, ch, 10, 6 + bob, 1, 2, Color.Black)
+            pxRect(left, top, cw, ch, 6, 12 + bob, 4, 2, Color(0xFFD8B880))
         }
+
+        EnemyKind.ONIL -> {
+            // Modrá hranatá příšerka Onil z 2. levelu
+            val blue = Color(0xFF2878F8)
+            pxRect(left, top, cw, ch, 2, 2 + bob, 12, 11, blue)
+            pxRect(left, top, cw, ch, 4, 4 + bob, 3, 3, Color.White)
+            pxRect(left, top, cw, ch, 9, 4 + bob, 3, 3, Color.White)
+            pxRect(left, top, cw, ch, 5, 5 + bob, 1, 2, Color.Black)
+            pxRect(left, top, cw, ch, 10, 5 + bob, 1, 2, Color.Black)
+            pxRect(left, top, cw, ch, 4, 9 + bob, 8, 2, Color(0xFFF8F8F8))
+        }
+
         EnemyKind.GHOST -> {
-            val cx = left + cw * 0.5f
-            val cy = top + ch * 0.46f
-            val path = Path().apply {
-                moveTo(left + cw * 0.16f, top + ch * 0.85f)
-                lineTo(left + cw * 0.16f, top + ch * 0.40f)
-                lineTo(left + cw * 0.50f, top + ch * 0.14f)
-                lineTo(left + cw * 0.84f, top + ch * 0.40f)
-                lineTo(left + cw * 0.84f, top + ch * 0.85f)
-                close()
-            }
-            drawPath(path, Color(0xFF38BDF8))
-            drawCircle(Color(0xFF38BDF8), cw * 0.34f, Offset(cx, cy))
-            drawCircle(Color.Yellow, cw * 0.08f, Offset(cx - cw * 0.12f, cy - ch * 0.04f))
-            drawCircle(Color.Yellow, cw * 0.08f, Offset(cx + cw * 0.12f, cy - ch * 0.04f))
+            // Duch procházející cihlovými zdmi
+            val cyan = Color(0xFF68D8F8)
+            pxRect(left, top, cw, ch, 3, 2 + bob, 10, 11, cyan)
+            pxRect(left, top, cw, ch, 2, 4 + bob, 12, 8, cyan)
+            pxRect(left, top, cw, ch, 2, 12 + bob, 2, 2, cyan)
+            pxRect(left, top, cw, ch, 7, 12 + bob, 2, 2, cyan)
+            pxRect(left, top, cw, ch, 12, 12 + bob, 2, 2, cyan)
+            pxRect(left, top, cw, ch, 4, 5 + bob, 2, 3, Color(0xFFD80000))
+            pxRect(left, top, cw, ch, 10, 5 + bob, 2, 3, Color(0xFFD80000))
         }
+
         EnemyKind.BEETLE -> {
-            val cx = left + cw * 0.5f
-            val cy = top + ch * 0.52f
-            drawCircle(Color(0xFFDC2626), cw * 0.35f, Offset(cx, cy))
-            drawCircle(Color.Black, cw * 0.18f, Offset(cx, top + ch * 0.25f))
-            drawCircle(Color.Black, cw * 0.06f, Offset(cx - cw * 0.14f, cy))
-            drawCircle(Color.Black, cw * 0.06f, Offset(cx + cw * 0.14f, cy))
-            drawCircle(Color.White, cw * 0.05f, Offset(cx - cw * 0.08f, top + ch * 0.22f))
-            drawCircle(Color.White, cw * 0.05f, Offset(cx + cw * 0.08f, top + ch * 0.22f))
+            // Červeno-černý brouk pro Bombíče
+            pxRect(left, top, cw, ch, 3, 3 + bob, 10, 10, Color(0xFFD81818))
+            pxRect(left, top, cw, ch, 4, 2 + bob, 8, 3, Color(0xFF101010))
+            pxRect(left, top, cw, ch, 7, 5 + bob, 2, 8, Color(0xFF101010))
+            pxRect(left, top, cw, ch, 5, 2 + bob, 2, 2, Color.White)
+            pxRect(left, top, cw, ch, 9, 2 + bob, 2, 2, Color.White)
+        }
+
+        EnemyKind.PONTAN -> {
+            // Zuřivá rotující mince při vypršení času nebo odpálení dveří
+            val col = if (tick % 2 == 0) Color(0xFFF8D800) else Color(0xFFF83800)
+            pxRect(left, top, cw, ch, 2, 2, 12, 12, col)
+            pxRect(left, top, cw, ch, 4, 5, 2, 2, Color.Black)
+            pxRect(left, top, cw, ch, 10, 5, 2, 2, Color.Black)
+            pxRect(left, top, cw, ch, 5, 10, 6, 2, Color.Black)
         }
     }
 }

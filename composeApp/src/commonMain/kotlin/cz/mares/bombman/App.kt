@@ -3,6 +3,7 @@ package cz.mares.bombman
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -42,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -51,6 +53,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
+import kotlin.math.abs
 
 enum class AppScreen {
     MENU,
@@ -69,7 +72,7 @@ fun App() {
 
         LaunchedEffect(currentScreen, engine.isPaused, engine.isGameOver) {
             while (currentScreen == AppScreen.PLAYING && !engine.isPaused && !engine.isGameOver) {
-                delay(55L)
+                delay(45L)
                 engine.tick()
             }
         }
@@ -77,9 +80,9 @@ fun App() {
         Surface(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFF0B1120))
+                .background(Color(0xFF080808))
                 .windowInsetsPadding(WindowInsets.safeDrawing),
-            color = Color(0xFF0B1120)
+            color = Color(0xFF080808)
         ) {
             when (currentScreen) {
                 AppScreen.MENU -> MainMenuScreen(
@@ -109,9 +112,11 @@ fun App() {
                         LeaderboardRepository.soundEnabled = soundOn
                     },
                     onOpenLeaderboard = {
+                        engine.heldDirection = Direction.NONE
                         currentScreen = AppScreen.LEADERBOARD
                     },
                     onBackToMenu = {
+                        engine.heldDirection = Direction.NONE
                         currentScreen = AppScreen.MENU
                     }
                 )
@@ -149,45 +154,56 @@ private fun MainMenuScreen(
                 .fillMaxSize()
                 .padding(horizontal = 12.dp, vertical = 6.dp)
         ) {
-            // Horní hlavička
+            // Retro horní hlavička ve stylu DOS Dyna Blaster
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 4.dp),
+                    .background(Color(0xFFA0A0A0))
+                    .border(2.dp, Color(0xFFE8E8E8))
+                    .padding(horizontal = 8.dp, vertical = 6.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "💣 BOMBMAN 4v1",
-                    color = Color(0xFFFBBF24),
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    fontFamily = FontFamily.Monospace,
-                    maxLines = 1,
-                    softWrap = false,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .background(Color.Black)
+                        .border(1.dp, Color(0xFF404040))
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = "BOMBMAN • RETRO 1992",
+                        color = Color(0xFFF8D800),
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontFamily = FontFamily.Monospace,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
                 Spacer(modifier = Modifier.width(8.dp))
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color(0xFF1E293B))
-                        .border(1.dp, Color(0xFF334155), RoundedCornerShape(8.dp))
+                        .background(Color(0xFF000000))
+                        .border(1.5.dp, Color(0xFFF89800))
                         .clickable { onToggleSound() }
                         .padding(horizontal = 10.dp, vertical = 5.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = if (soundOn) "🔊 ZVUK ZAP" else "🔇 ZVUK VYP",
-                        color = if (soundOn) Color(0xFF4ADE80) else Color(0xFF94A3B8),
+                        color = if (soundOn) Color(0xFF48F848) else Color(0xFFA0A0A0),
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace,
                         maxLines = 1,
                         softWrap = false
                     )
                 }
             }
+
+            Spacer(modifier = Modifier.height(6.dp))
 
             // Střední posuvná část
             Column(
@@ -197,10 +213,11 @@ private fun MainMenuScreen(
                     .verticalScroll(scrollState)
             ) {
                 Text(
-                    text = "VYBER HERNÍ EDICI (KLIKNI PRO VÝBĚR):",
-                    color = Color(0xFF94A3B8),
+                    text = "VYBER HERNÍ EDICI (DRUHÝM KLIKNUTÍM SPUSTÍŠ):",
+                    color = Color(0xFFF89800),
                     fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace
                 )
                 Spacer(modifier = Modifier.height(4.dp))
 
@@ -266,10 +283,11 @@ private fun MainMenuScreen(
 
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "OBTÍŽNOST A NÁSOBIČ BODŮ:",
-                    color = Color(0xFF94A3B8),
+                    text = "RYCHLOST A OBTÍŽNOST:",
+                    color = Color(0xFFF89800),
                     fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace
                 )
                 Spacer(modifier = Modifier.height(4.dp))
 
@@ -282,12 +300,10 @@ private fun MainMenuScreen(
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(if (active) Color(0xFF2563EB) else Color(0xFF1E293B))
+                                .background(if (active) Color(0xFFD82800) else Color(0xFF181818))
                                 .border(
-                                    width = if (active) 2.dp else 1.dp,
-                                    color = if (active) Color(0xFF60A5FA) else Color(0xFF334155),
-                                    shape = RoundedCornerShape(8.dp)
+                                    width = 2.dp,
+                                    color = if (active) Color(0xFFF8D800) else Color(0xFF585858)
                                 )
                                 .clickable { onSelectDifficulty(diff) }
                                 .padding(vertical = 7.dp, horizontal = 4.dp),
@@ -298,6 +314,7 @@ private fun MainMenuScreen(
                                 color = Color.White,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace,
                                 maxLines = 1,
                                 softWrap = false
                             )
@@ -322,15 +339,16 @@ private fun MainMenuScreen(
                             onClick = onStartGame,
                             modifier = Modifier
                                 .weight(1.3f)
-                                .height(42.dp),
-                            shape = RoundedCornerShape(10.dp),
-                            colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF16A34A))
+                                .height(42.dp)
+                                .border(2.dp, Color(0xFFF8D800)),
+                            colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF188818))
                         ) {
                             Text(
-                                text = "▶ HRÁT: ${selectedEdition.title}",
+                                text = "▶ START: ${selectedEdition.title}",
                                 color = Color.White,
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.ExtraBold,
+                                fontFamily = FontFamily.Monospace,
                                 maxLines = 1,
                                 softWrap = false,
                                 overflow = TextOverflow.Ellipsis
@@ -340,15 +358,16 @@ private fun MainMenuScreen(
                             onClick = onOpenLeaderboard,
                             modifier = Modifier
                                 .weight(1f)
-                                .height(42.dp),
-                            shape = RoundedCornerShape(10.dp),
-                            colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF1E293B))
+                                .height(42.dp)
+                                .border(2.dp, Color(0xFF888888)),
+                            colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF202020))
                         ) {
                             Text(
                                 text = "🏆 REKORDY (TOP 50)",
-                                color = Color(0xFFFBBF24),
+                                color = Color(0xFFF8D800),
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace,
                                 maxLines = 1,
                                 softWrap = false
                             )
@@ -359,15 +378,16 @@ private fun MainMenuScreen(
                         onClick = onStartGame,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(46.dp),
-                        shape = RoundedCornerShape(10.dp),
-                        colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF16A34A))
+                            .height(46.dp)
+                            .border(2.dp, Color(0xFFF8D800)),
+                        colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF188818))
                     ) {
                         Text(
-                            text = "▶ HRÁT: ${selectedEdition.title}",
+                            text = "▶ START: ${selectedEdition.title}",
                             color = Color.White,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.ExtraBold,
+                            fontFamily = FontFamily.Monospace,
                             maxLines = 1,
                             softWrap = false,
                             overflow = TextOverflow.Ellipsis
@@ -378,15 +398,16 @@ private fun MainMenuScreen(
                         onClick = onOpenLeaderboard,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(40.dp),
-                        shape = RoundedCornerShape(10.dp),
-                        colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF1E293B))
+                            .height(40.dp)
+                            .border(2.dp, Color(0xFF888888)),
+                        colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF202020))
                     ) {
                         Text(
                             text = "🏆 ONLINE REKORDY (TOP 50)",
-                            color = Color(0xFFFBBF24),
+                            color = Color(0xFFF8D800),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace,
                             maxLines = 1,
                             softWrap = false
                         )
@@ -396,8 +417,9 @@ private fun MainMenuScreen(
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = "© 2026 Created by Pavel Mareš",
-                    color = Color(0xFF64748B),
+                    color = Color(0xFF787878),
                     fontSize = 10.sp,
+                    fontFamily = FontFamily.Monospace,
                     textAlign = TextAlign.Center
                 )
             }
@@ -412,15 +434,14 @@ private fun EditionCard(
     onSelect: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val borderCol = if (isSelected) Color(0xFFF59E0B) else Color(0xFF334155)
-    val bgCol = if (isSelected) Color(0xFF1E293B) else Color(0xFF0F172A)
+    val borderCol = if (isSelected) Color(0xFFF8D800) else Color(0xFF585858)
+    val bgCol = if (isSelected) Color(0xFF182438) else Color(0xFF101010)
     val best = LeaderboardRepository.getLocalBestScore(ed.firebaseKey)
 
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(10.dp))
             .background(bgCol)
-            .border(if (isSelected) 2.dp else 1.dp, borderCol, RoundedCornerShape(10.dp))
+            .border(if (isSelected) 2.dp else 1.dp, borderCol)
             .clickable { onSelect() }
             .padding(horizontal = 10.dp, vertical = 7.dp)
     ) {
@@ -431,9 +452,10 @@ private fun EditionCard(
         ) {
             Text(
                 text = "${ed.title} (${ed.year})",
-                color = if (isSelected) Color(0xFFFBBF24) else Color.White,
+                color = if (isSelected) Color(0xFFF8D800) else Color.White,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.ExtraBold,
+                fontFamily = FontFamily.Monospace,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
@@ -441,16 +463,16 @@ private fun EditionCard(
             Spacer(modifier = Modifier.width(6.dp))
             Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(Color(0xFF0F172A))
-                    .border(1.dp, Color(0xFF334155), RoundedCornerShape(6.dp))
+                    .background(Color.Black)
+                    .border(1.dp, Color(0xFFF89800))
                     .padding(horizontal = 6.dp, vertical = 2.dp)
             ) {
                 Text(
-                    text = "REKORD: $best",
-                    color = Color(0xFF38BDF8),
+                    text = "TOP: $best",
+                    color = Color(0xFFF8D800),
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace,
                     maxLines = 1,
                     softWrap = false
                 )
@@ -459,7 +481,7 @@ private fun EditionCard(
         Spacer(modifier = Modifier.height(3.dp))
         Text(
             text = ed.description,
-            color = Color(0xFFCBD5E1),
+            color = Color(0xFFD0D0D0),
             fontSize = 11.sp,
             lineHeight = 14.sp
         )
@@ -482,17 +504,17 @@ private fun PlayingScreen(
         val isLandscape = maxWidth > maxHeight
 
         if (isLandscape) {
-            // ROZLOŽENÍ NA LEŽATO (3 sloupce: Vlevo info + D-Pad, Uprostřed celá aréna, Vpravo menu + BOMBA)
+            // ROZLOŽENÍ NA LEŽATO (Levý sloupec: Retro HUD + D-Pad, Střed: Celá aréna 15x11, Pravý sloupec: Menu + A/B tlačítka)
             Row(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                    .padding(horizontal = 6.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // 1. Levý panel: Statistiky nahoře + D-Pad dole
+                // 1. Levý panel: Klasický Dyna Blaster HUD + plynulý D-Pad
                 Column(
                     modifier = Modifier
-                        .width(142.dp)
+                        .width(146.dp)
                         .fillMaxHeight(),
                     verticalArrangement = Arrangement.SpaceBetween,
                     horizontalAlignment = Alignment.CenterHorizontally
@@ -500,84 +522,68 @@ private fun PlayingScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Color(0xFF1E293B))
-                            .border(1.dp, Color(0xFF334155), RoundedCornerShape(8.dp))
-                            .padding(horizontal = 8.dp, vertical = 6.dp)
+                            .background(Color(0xFFA0A0A0))
+                            .border(2.dp, Color(0xFFE8E8E8))
+                            .padding(5.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        Text(
-                            text = "${engine.edition.shortTab} • KOLO ${engine.level}",
-                            color = Color(0xFFFBBF24),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            maxLines = 1,
-                            softWrap = false
-                        )
-                        Spacer(modifier = Modifier.height(3.dp))
-                        Text(
-                            text = "BODY: ${engine.score}",
-                            color = Color.White,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            softWrap = false
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
+                        RetroDigitalBox(label = "TIME", value = timeStr, valueColor = if (engine.timeLeftSeconds <= 30) Color(0xFFF83800) else Color.White)
+                        RetroDigitalBox(label = "SCORE", value = "${engine.score}", valueColor = Color(0xFFF8D800))
+                        RetroDigitalBox(label = "LEFT", value = "${engine.lives} • ST.${engine.level}", valueColor = Color(0xFF48F848))
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color.Black)
+                                .padding(horizontal = 4.dp, vertical = 2.dp),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text(
-                                text = "❤️ ${engine.lives}",
-                                color = Color(0xFFF87171),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
+                                text = "💣${engine.maxBombs} 🔥${engine.fireRange}",
+                                color = Color(0xFF68D8F8),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
                             )
                             Text(
-                                text = "⏱ $timeStr",
-                                color = if (engine.timeLeftSeconds <= 30) Color(0xFFEF4444) else Color(0xFF38BDF8),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
+                                text = buildString {
+                                    if (engine.hasDetonator) append("B ")
+                                    if (engine.hasKick) append("👟")
+                                    if (engine.hasWallPass) append("🧱")
+                                }.ifEmpty { engine.edition.shortTab },
+                                color = Color(0xFFF89800),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
                             )
                         }
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = "💣${engine.maxBombs} 🔥${engine.fireRange}${if (engine.hasKick) " 👟" else ""}",
-                            color = Color(0xFFA7F3D0),
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            softWrap = false
-                        )
                     }
 
-                    // D-Pad v levém dolním rohu mimo hrací plochu
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.padding(bottom = 2.dp)
-                    ) {
-                        DPadButton(label = "▲", btnSize = 42.dp, onClick = { engine.movePlayer(Direction.UP) })
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            DPadButton(label = "◀", btnSize = 42.dp, onClick = { engine.movePlayer(Direction.LEFT) })
-                            Spacer(modifier = Modifier.width(30.dp))
-                            DPadButton(label = "▶", btnSize = 42.dp, onClick = { engine.movePlayer(Direction.RIGHT) })
+                    // Plynulý dotykový D-Pad (podporuje držení i sklouznutí palce)
+                    RetroTouchDPad(
+                        activeDir = engine.heldDirection,
+                        padSize = 136.dp,
+                        onDirectionChange = { dir ->
+                            engine.heldDirection = dir
+                            if (dir != Direction.NONE) {
+                                engine.movePlayer(dir)
+                            }
                         }
-                        DPadButton(label = "▼", btnSize = 42.dp, onClick = { engine.movePlayer(Direction.DOWN) })
-                    }
+                    )
                 }
 
-                // 2. Střední panel: Kompletní herní aréna odshora dolů
+                // 2. Střední panel: Kompletní herní aréna
                 Column(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxHeight()
-                        .padding(horizontal = 6.dp),
+                        .padding(horizontal = 4.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
                         text = engine.statusMessage,
-                        color = Color(0xFFCBD5E1),
+                        color = Color(0xFFF8D800),
                         fontSize = 10.sp,
+                        fontFamily = FontFamily.Monospace,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         textAlign = TextAlign.Center,
@@ -601,92 +607,93 @@ private fun PlayingScreen(
                     }
                 }
 
-                // 3. Pravý panel: Ovládání hry nahoře + Tlačítko BOMBA + Copyright dole
+                // 3. Pravý panel: Ovládání nahoře + Tlačítka A (BOMBA) a B (ODPAL) + Copyright
                 Column(
                     modifier = Modifier
-                        .width(126.dp)
+                        .width(124.dp)
                         .fillMaxHeight(),
                     verticalArrangement = Arrangement.SpaceBetween,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.End,
-                        modifier = Modifier.fillMaxWidth()
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            SmallHudButton(text = if (soundOn) "🔊" else "🔇", onClick = onToggleSound)
-                            SmallHudButton(
-                                text = if (engine.isPaused) "▶" else "⏸",
-                                onClick = { engine.isPaused = !engine.isPaused }
-                            )
-                            SmallHudButton(text = "MENU", onClick = onBackToMenu)
-                        }
+                        SmallHudButton(text = if (soundOn) "🔊" else "🔇", onClick = onToggleSound)
+                        SmallHudButton(
+                            text = if (engine.isPaused) "▶" else "⏸",
+                            onClick = { engine.isPaused = !engine.isPaused }
+                        )
+                        SmallHudButton(text = "EXIT", onClick = onBackToMenu)
                     }
 
-                    Box(
-                        modifier = Modifier
-                            .size(92.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFFDC2626))
-                            .border(4.dp, Color(0xFFFCA5A5), CircleShape)
-                            .clickable { engine.placeBomb() },
-                        contentAlignment = Alignment.Center
+                    // Akční tlačítka B (Odpal) a A (Bomba)
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(text = "💣", fontSize = 22.sp)
-                            Text(
-                                text = "BOMBA",
-                                color = Color.White,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                maxLines = 1,
-                                softWrap = false
-                            )
-                        }
+                        RetroActionButton(
+                            code = "B",
+                            label = "ODPAL",
+                            enabled = engine.hasDetonator,
+                            bgColor = if (engine.hasDetonator) Color(0xFF1858C8) else Color(0xFF282828),
+                            borderColor = if (engine.hasDetonator) Color(0xFF68D8F8) else Color(0xFF585858),
+                            btnSize = 54.dp,
+                            onClick = { engine.detonateOldestBomb() }
+                        )
+                        RetroActionButton(
+                            code = "A",
+                            label = "BOMBA",
+                            enabled = true,
+                            bgColor = Color(0xFFD82800),
+                            borderColor = Color(0xFFF8B800),
+                            btnSize = 86.dp,
+                            onClick = { engine.placeBomb() }
+                        )
                     }
 
                     Text(
                         text = "© 2026 Created by\nPavel Mareš",
-                        color = Color(0xFF64748B),
+                        color = Color(0xFF787878),
                         fontSize = 9.sp,
                         lineHeight = 11.sp,
+                        fontFamily = FontFamily.Monospace,
                         textAlign = TextAlign.Center
                     )
                 }
             }
         } else {
-            // ROZLOŽENÍ NA VÝŠKU
+            // ROZLOŽENÍ NA VÝŠKU (Klasická horní lišta z Dyna Blasteru + Aréna + D-Pad a A/B tlačítka dole)
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Column(modifier = Modifier.fillMaxWidth()) {
+                // Horní retro panel ve stylu DOS Dyna Blaster
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFFA0A0A0))
+                        .border(2.dp, Color(0xFFE8E8E8))
+                        .padding(horizontal = 6.dp, vertical = 5.dp)
+                ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "${engine.edition.shortTab} • KOLO ${engine.level}",
-                            color = Color(0xFFFBBF24),
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            maxLines = 1,
-                            softWrap = false,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        RetroTopCell(label = "TIME", value = timeStr, valueColor = if (engine.timeLeftSeconds <= 30) Color(0xFFF83800) else Color.White)
+                        RetroTopCell(label = "SCORE", value = "${engine.score}", valueColor = Color(0xFFF8D800))
+                        RetroTopCell(label = "LEFT", value = "${engine.lives}", valueColor = Color(0xFF48F848))
+
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                             SmallHudButton(text = if (soundOn) "🔊" else "🔇", onClick = onToggleSound)
                             SmallHudButton(
                                 text = if (engine.isPaused) "▶" else "⏸",
                                 onClick = { engine.isPaused = !engine.isPaused }
                             )
-                            SmallHudButton(text = "MENU", onClick = onBackToMenu)
+                            SmallHudButton(text = "EXIT", onClick = onBackToMenu)
                         }
                     }
 
@@ -695,58 +702,43 @@ private fun PlayingScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Color(0xFF1E293B))
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                            .background(Color.Black)
+                            .padding(horizontal = 6.dp, vertical = 3.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "BODY: ${engine.score}",
-                            color = Color.White,
-                            fontSize = 11.sp,
+                            text = "STAGE ${engine.level} • ${engine.edition.shortTab}",
+                            color = Color(0xFFF89800),
+                            fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            softWrap = false
+                            fontFamily = FontFamily.Monospace
                         )
                         Text(
-                            text = "❤️ ${engine.lives}",
-                            color = Color(0xFFF87171),
-                            fontSize = 11.sp,
+                            text = "💣${engine.maxBombs} 🔥${engine.fireRange}" +
+                                (if (engine.hasDetonator) " [B:ODPAL]" else "") +
+                                (if (engine.hasKick) " [KOP]" else ""),
+                            color = Color(0xFF68D8F8),
+                            fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            softWrap = false
-                        )
-                        Text(
-                            text = "⏱ $timeStr",
-                            color = if (engine.timeLeftSeconds <= 30) Color(0xFFEF4444) else Color(0xFF38BDF8),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            softWrap = false
-                        )
-                        Text(
-                            text = "💣${engine.maxBombs} 🔥${engine.fireRange}${if (engine.hasKick) " 👟" else ""}",
-                            color = Color(0xFFA7F3D0),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            softWrap = false
+                            fontFamily = FontFamily.Monospace
                         )
                     }
-
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = engine.statusMessage,
-                        color = Color(0xFFCBD5E1),
-                        fontSize = 10.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.fillMaxWidth(),
-                        textAlign = TextAlign.Center
-                    )
                 }
 
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = engine.statusMessage,
+                    color = Color(0xFFF8D800),
+                    fontSize = 10.sp,
+                    fontFamily = FontFamily.Monospace,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center
+                )
+
+                // Herní aréna uprostřed
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -764,6 +756,7 @@ private fun PlayingScreen(
                     )
                 }
 
+                // Spodní ovládací konzole: Vlevo plynulý D-Pad, vpravo tlačítka B (ODPAL) a A (BOMBA)
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.fillMaxWidth()
@@ -771,47 +764,51 @@ private fun PlayingScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 8.dp, vertical = 2.dp),
+                            .padding(horizontal = 6.dp, vertical = 4.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            DPadButton(label = "▲", btnSize = 46.dp, onClick = { engine.movePlayer(Direction.UP) })
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                DPadButton(label = "◀", btnSize = 46.dp, onClick = { engine.movePlayer(Direction.LEFT) })
-                                Spacer(modifier = Modifier.width(34.dp))
-                                DPadButton(label = "▶", btnSize = 46.dp, onClick = { engine.movePlayer(Direction.RIGHT) })
+                        RetroTouchDPad(
+                            activeDir = engine.heldDirection,
+                            padSize = 144.dp,
+                            onDirectionChange = { dir ->
+                                engine.heldDirection = dir
+                                if (dir != Direction.NONE) {
+                                    engine.movePlayer(dir)
+                                }
                             }
-                            DPadButton(label = "▼", btnSize = 46.dp, onClick = { engine.movePlayer(Direction.DOWN) })
-                        }
+                        )
 
-                        Box(
-                            modifier = Modifier
-                                .size(96.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFFDC2626))
-                                .border(4.dp, Color(0xFFFCA5A5), CircleShape)
-                                .clickable { engine.placeBomb() },
-                            contentAlignment = Alignment.Center
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(text = "💣", fontSize = 24.sp)
-                                Text(
-                                    text = "BOMBA",
-                                    color = Color.White,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    maxLines = 1,
-                                    softWrap = false
-                                )
-                            }
+                            RetroActionButton(
+                                code = "B",
+                                label = "ODPAL",
+                                enabled = engine.hasDetonator,
+                                bgColor = if (engine.hasDetonator) Color(0xFF1858C8) else Color(0xFF282828),
+                                borderColor = if (engine.hasDetonator) Color(0xFF68D8F8) else Color(0xFF585858),
+                                btnSize = 62.dp,
+                                onClick = { engine.detonateOldestBomb() }
+                            )
+                            RetroActionButton(
+                                code = "A",
+                                label = "BOMBA",
+                                enabled = true,
+                                bgColor = Color(0xFFD82800),
+                                borderColor = Color(0xFFF8B800),
+                                btnSize = 94.dp,
+                                onClick = { engine.placeBomb() }
+                            )
                         }
                     }
 
                     Text(
                         text = "© 2026 Created by Pavel Mareš",
-                        color = Color(0xFF64748B),
+                        color = Color(0xFF787878),
                         fontSize = 10.sp,
+                        fontFamily = FontFamily.Monospace,
                         textAlign = TextAlign.Center
                     )
                 }
@@ -821,31 +818,296 @@ private fun PlayingScreen(
 }
 
 @Composable
+private fun RetroTopCell(label: String, value: String, valueColor: Color) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .background(Color.Black)
+            .border(1.dp, Color(0xFFF89800))
+            .padding(horizontal = 6.dp, vertical = 3.dp)
+    ) {
+        Text(
+            text = "$label ",
+            color = Color(0xFFF89800),
+            fontSize = 10.sp,
+            fontWeight = FontWeight.ExtraBold,
+            fontFamily = FontFamily.Monospace,
+            maxLines = 1,
+            softWrap = false
+        )
+        Text(
+            text = value,
+            color = valueColor,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.ExtraBold,
+            fontFamily = FontFamily.Monospace,
+            maxLines = 1,
+            softWrap = false
+        )
+    }
+}
+
+@Composable
+private fun RetroDigitalBox(label: String, value: String, valueColor: Color) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.Black)
+            .border(1.dp, Color(0xFFF89800))
+            .padding(horizontal = 6.dp, vertical = 3.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            color = Color(0xFFF89800),
+            fontSize = 10.sp,
+            fontWeight = FontWeight.ExtraBold,
+            fontFamily = FontFamily.Monospace
+        )
+        Text(
+            text = value,
+            color = valueColor,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.ExtraBold,
+            fontFamily = FontFamily.Monospace,
+            maxLines = 1,
+            softWrap = false
+        )
+    }
+}
+
+/**
+ * Dotykový směrový kříž (D-Pad), který podporuje plynulé držení prstu
+ * i přejíždění palcem mezi směry bez zvednutí prstu z obrazovky.
+ */
+@Composable
+private fun RetroTouchDPad(
+    activeDir: Direction,
+    padSize: Dp,
+    onDirectionChange: (Direction) -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .size(padSize)
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    val down = awaitPointerEvent()
+                    val firstChange = down.changes.firstOrNull()
+                    if (firstChange != null && firstChange.pressed) {
+                        val dir = computeDPadDirection(firstChange.position.x, firstChange.position.y, size.width.toFloat(), size.height.toFloat())
+                        onDirectionChange(dir)
+                    }
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val activePointer = event.changes.firstOrNull { it.pressed }
+                        if (activePointer != null) {
+                            activePointer.consume()
+                            val dir = computeDPadDirection(
+                                activePointer.position.x,
+                                activePointer.position.y,
+                                size.width.toFloat(),
+                                size.height.toFloat()
+                            )
+                            onDirectionChange(dir)
+                        } else {
+                            onDirectionChange(Direction.NONE)
+                            break
+                        }
+                    }
+                }
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        val armThickness = padSize * 0.34f
+
+        // Svislé rameno kříže
+        Column(
+            modifier = Modifier
+                .width(armThickness)
+                .fillMaxHeight()
+                .background(Color(0xFF202020))
+                .border(2.dp, Color(0xFF787878)),
+            verticalArrangement = Arrangement.SpaceBetween,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .background(if (activeDir == Direction.UP) Color(0xFFF89800) else Color(0xFF282828)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("▲", color = if (activeDir == Direction.UP) Color.Black else Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            }
+            Spacer(modifier = Modifier.height(armThickness))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .background(if (activeDir == Direction.DOWN) Color(0xFFF89800) else Color(0xFF282828)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("▼", color = if (activeDir == Direction.DOWN) Color.Black else Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+
+        // Vodorovné rameno kříže
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(armThickness)
+                .background(Color(0xFF202020))
+                .border(2.dp, Color(0xFF787878)),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .weight(1f)
+                    .background(if (activeDir == Direction.LEFT) Color(0xFFF89800) else Color(0xFF282828)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("◀", color = if (activeDir == Direction.LEFT) Color.Black else Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            }
+            Box(
+                modifier = Modifier
+                    .size(armThickness)
+                    .background(Color(0xFF181818)),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(armThickness * 0.45f)
+                        .clip(CircleShape)
+                        .background(Color(0xFF404040))
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .weight(1f)
+                    .background(if (activeDir == Direction.RIGHT) Color(0xFFF89800) else Color(0xFF282828)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("▶", color = if (activeDir == Direction.RIGHT) Color.Black else Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+private fun computeDPadDirection(x: Float, y: Float, w: Float, h: Float): Direction {
+    val cx = w * 0.5f
+    val cy = h * 0.5f
+    val dx = x - cx
+    val dy = y - cy
+    val deadZone = w * 0.07f
+    if (abs(dx) < deadZone && abs(dy) < deadZone) return Direction.NONE
+    return if (abs(dx) > abs(dy)) {
+        if (dx > 0f) Direction.RIGHT else Direction.LEFT
+    } else {
+        if (dy > 0f) Direction.DOWN else Direction.UP
+    }
+}
+
+@Composable
+private fun RetroActionButton(
+    code: String,
+    label: String,
+    enabled: Boolean,
+    bgColor: Color,
+    borderColor: Color,
+    btnSize: Dp,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .size(btnSize)
+            .clip(CircleShape)
+            .background(bgColor)
+            .border(3.dp, borderColor, CircleShape)
+            .clickable { onClick() },
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = code,
+                color = if (enabled) Color(0xFFF8F800) else Color(0xFF888888),
+                fontSize = (btnSize.value * 0.24f).sp,
+                fontWeight = FontWeight.ExtraBold,
+                fontFamily = FontFamily.Monospace
+            )
+            Text(
+                text = label,
+                color = if (enabled) Color.White else Color(0xFF888888),
+                fontSize = (btnSize.value * 0.13f).sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace,
+                maxLines = 1,
+                softWrap = false
+            )
+        }
+    }
+}
+
+@Composable
 private fun GameOverlays(
     engine: GameEngine,
     onOpenLeaderboard: () -> Unit
 ) {
-    if (engine.isVictoryBanner) {
+    // Klasická černá obrazovka "STAGE X" před začátkem kola jako v Dyna Blasteru
+    if (engine.stageIntroTicks > 0) {
         Box(
             modifier = Modifier
-                .clip(RoundedCornerShape(12.dp))
-                .background(Color(0xEE0F172A))
-                .border(2.dp, Color(0xFF22C55E), RoundedCornerShape(12.dp))
-                .padding(18.dp),
+                .fillMaxSize()
+                .background(Color.Black),
             contentAlignment = Alignment.Center
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    text = "🎉 KOLO ${engine.level} DOKONČENO!",
-                    color = Color(0xFF4ADE80),
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.ExtraBold
+                    text = "STAGE  ${engine.level}",
+                    color = Color.White,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontFamily = FontFamily.Monospace
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = engine.edition.title,
+                    color = Color(0xFFF89800),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+        }
+        return
+    }
+
+    if (engine.isVictoryBanner) {
+        Box(
+            modifier = Modifier
+                .background(Color.Black)
+                .border(2.dp, Color(0xFF48F848))
+                .padding(20.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = "STAGE ${engine.level} CLEAR!",
+                    color = Color(0xFF48F848),
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontFamily = FontFamily.Monospace
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = "Připrav se na další arénu...",
-                    color = Color.White,
-                    fontSize = 12.sp
+                    text = "SCORE: ${engine.score}",
+                    color = Color(0xFFF8D800),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace
                 )
             }
         }
@@ -854,39 +1116,40 @@ private fun GameOverlays(
     if (engine.isGameOver) {
         Box(
             modifier = Modifier
-                .clip(RoundedCornerShape(12.dp))
-                .background(Color(0xF00F172A))
-                .border(2.dp, Color(0xFFEF4444), RoundedCornerShape(12.dp))
-                .padding(16.dp),
+                .background(Color.Black)
+                .border(2.dp, Color(0xFFF83800))
+                .padding(18.dp),
             contentAlignment = Alignment.Center
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    text = "💥 KONEC HRY",
-                    color = Color(0xFFF87171),
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.ExtraBold
+                    text = "GAME OVER",
+                    color = Color(0xFFF83800),
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontFamily = FontFamily.Monospace
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = "Nahrané skóre: ${engine.score}",
-                    color = Color(0xFFFBBF24),
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold
+                    text = "SCORE: ${engine.score}",
+                    color = Color(0xFFF8D800),
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace
                 )
-                Spacer(modifier = Modifier.height(10.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Button(
                         onClick = { engine.startNewGame(engine.edition, engine.difficulty) },
-                        colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF16A34A))
+                        colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF188818))
                     ) {
-                        Text("HRÁT ZNOVU", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text("CONTINUE", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
                     }
                     Button(
                         onClick = onOpenLeaderboard,
-                        colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF2563EB))
+                        colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF1858C8))
                     ) {
-                        Text("REKORDY", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text("TOP 50", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
                     }
                 }
             }
@@ -898,9 +1161,8 @@ private fun GameOverlays(
 private fun SmallHudButton(text: String, onClick: () -> Unit) {
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(Color(0xFF1E293B))
-            .border(1.dp, Color(0xFF334155), RoundedCornerShape(6.dp))
+            .background(Color.Black)
+            .border(1.dp, Color(0xFFF89800))
             .clickable { onClick() }
             .padding(horizontal = 7.dp, vertical = 4.dp),
         contentAlignment = Alignment.Center
@@ -908,30 +1170,11 @@ private fun SmallHudButton(text: String, onClick: () -> Unit) {
         Text(
             text = text,
             color = Color.White,
-            fontSize = 11.sp,
+            fontSize = 10.sp,
             fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace,
             maxLines = 1,
             softWrap = false
-        )
-    }
-}
-
-@Composable
-private fun DPadButton(label: String, btnSize: Dp = 46.dp, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .size(btnSize)
-            .clip(RoundedCornerShape(10.dp))
-            .background(Color(0xFF1E293B))
-            .border(1.5.dp, Color(0xFF475569), RoundedCornerShape(10.dp))
-            .clickable { onClick() },
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = label,
-            color = Color.White,
-            fontSize = 17.sp,
-            fontWeight = FontWeight.Bold
         )
     }
 }
@@ -983,17 +1226,18 @@ private fun LeaderboardScreen(
             ) {
                 Text(
                     text = "ONLINE REKORDY (TOP 50)",
-                    color = Color(0xFFFBBF24),
+                    color = Color(0xFFF8D800),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.ExtraBold,
+                    fontFamily = FontFamily.Monospace,
                     maxLines = 1,
                     softWrap = false,
                     modifier = Modifier.weight(1f)
                 )
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(Color(0xFF2563EB))
+                        .background(Color(0xFF1858C8))
+                        .border(1.dp, Color(0xFF68D8F8))
                         .clickable { loadLeaderboard(activeTab) }
                         .padding(horizontal = 10.dp, vertical = 6.dp)
                 ) {
@@ -1002,6 +1246,7 @@ private fun LeaderboardScreen(
                         color = Color.White,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace,
                         maxLines = 1,
                         softWrap = false
                     )
@@ -1019,17 +1264,18 @@ private fun LeaderboardScreen(
                     Box(
                         modifier = Modifier
                             .weight(1f)
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(if (selected) Color(0xFFF59E0B) else Color(0xFF1E293B))
+                            .background(if (selected) Color(0xFFF89800) else Color(0xFF202020))
+                            .border(1.dp, if (selected) Color(0xFFF8D800) else Color(0xFF585858))
                             .clickable { activeTab = ed }
                             .padding(vertical = 6.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = ed.shortTab,
-                            color = if (selected) Color(0xFF0F172A) else Color.White,
+                            color = if (selected) Color.Black else Color.White,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.ExtraBold,
+                            fontFamily = FontFamily.Monospace,
                             maxLines = 1,
                             softWrap = false
                         )
@@ -1046,14 +1292,13 @@ private fun LeaderboardScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color(0xFF1E293B))
-                        .border(1.dp, Color(0xFF334155), RoundedCornerShape(8.dp))
+                        .background(Color(0xFF181818))
+                        .border(1.dp, Color(0xFF585858))
                         .padding(8.dp)
                 ) {
                     Text(
                         text = "Zadej přezdívku pro zápis do TOP 50 (po uložení se uzamkne):",
-                        color = Color(0xFFCBD5E1),
+                        color = Color(0xFFD0D0D0),
                         fontSize = 11.sp
                     )
                     Spacer(modifier = Modifier.height(6.dp))
@@ -1064,28 +1309,27 @@ private fun LeaderboardScreen(
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(Color(0xFF0F172A))
-                                .border(1.dp, Color(0xFF475569), RoundedCornerShape(6.dp))
+                                .background(Color.Black)
+                                .border(1.dp, Color(0xFFF89800))
                                 .padding(horizontal = 10.dp, vertical = 8.dp)
                         ) {
                             if (nickInput.isEmpty()) {
-                                Text("Tvoje přezdívka...", color = Color(0xFF64748B), fontSize = 12.sp)
+                                Text("Tvoje přezdívka...", color = Color(0xFF787878), fontSize = 12.sp)
                             }
                             BasicTextField(
                                 value = nickInput,
                                 onValueChange = { if (it.length <= 14) nickInput = it },
                                 singleLine = true,
-                                textStyle = TextStyle(color = Color.White, fontSize = 12.sp),
-                                cursorBrush = SolidColor(Color(0xFFFBBF24)),
+                                textStyle = TextStyle(color = Color.White, fontSize = 12.sp, fontFamily = FontFamily.Monospace),
+                                cursorBrush = SolidColor(Color(0xFFF8D800)),
                                 modifier = Modifier.fillMaxWidth()
                             )
                         }
 
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(Color(0xFF16A34A))
+                                .background(Color(0xFF188818))
+                                .border(1.dp, Color(0xFF48F848))
                                 .clickable {
                                     LeaderboardRepository.submitScore(
                                         gameId = activeTab.firebaseKey,
@@ -1106,6 +1350,7 @@ private fun LeaderboardScreen(
                                 color = Color.White,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace,
                                 maxLines = 1,
                                 softWrap = false
                             )
@@ -1116,27 +1361,28 @@ private fun LeaderboardScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color(0xFF1E293B))
-                        .border(1.dp, Color(0xFF334155), RoundedCornerShape(8.dp))
+                        .background(Color(0xFF181818))
+                        .border(1.dp, Color(0xFFF89800))
                         .padding(horizontal = 10.dp, vertical = 7.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
                         text = "HRÁČ: $savedNick",
-                        color = Color(0xFF4ADE80),
+                        color = Color(0xFF48F848),
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace,
                         modifier = Modifier.weight(1f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
                         text = "OSOBNÍ: $localBest",
-                        color = Color(0xFFFBBF24),
+                        color = Color(0xFFF8D800),
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace,
                         maxLines = 1,
                         softWrap = false
                     )
@@ -1147,7 +1393,7 @@ private fun LeaderboardScreen(
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = infoMessage!!,
-                    color = Color(0xFF38BDF8),
+                    color = Color(0xFF68D8F8),
                     fontSize = 11.sp
                 )
             }
@@ -1158,20 +1404,20 @@ private fun LeaderboardScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFF0F172A))
-                    .border(1.dp, Color(0xFF1E293B), RoundedCornerShape(8.dp))
+                    .background(Color.Black)
+                    .border(1.dp, Color(0xFF585858))
             ) {
                 if (isLoading) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("Načítám online rekordy...", color = Color(0xFF94A3B8), fontSize = 12.sp)
+                        Text("Načítám online rekordy...", color = Color(0xFFA0A0A0), fontSize = 12.sp, fontFamily = FontFamily.Monospace)
                     }
                 } else if (scores.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(
                             text = "Zatím žádné rekordy v kategorii ${activeTab.title}. Buď první!",
-                            color = Color(0xFF94A3B8),
+                            color = Color(0xFFA0A0A0),
                             fontSize = 12.sp,
+                            fontFamily = FontFamily.Monospace,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.padding(16.dp)
                         )
@@ -1180,11 +1426,10 @@ private fun LeaderboardScreen(
                     LazyColumn(modifier = Modifier.fillMaxSize().padding(6.dp)) {
                         itemsIndexed(scores) { idx, item ->
                             val isMe = savedNick.isNotBlank() && item.nick.equals(savedNick, ignoreCase = true)
-                            val rowBg = if (isMe) Color(0xFF1E3A8A) else if (idx % 2 == 0) Color(0xFF1E293B) else Color.Transparent
+                            val rowBg = if (isMe) Color(0xFF183868) else if (idx % 2 == 0) Color(0xFF141414) else Color.Transparent
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(6.dp))
                                     .background(rowBg)
                                     .padding(horizontal = 10.dp, vertical = 6.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -1192,8 +1437,9 @@ private fun LeaderboardScreen(
                             ) {
                                 Text(
                                     text = "${idx + 1}. ${item.nick}",
-                                    color = if (isMe) Color(0xFFFBBF24) else Color.White,
+                                    color = if (isMe) Color(0xFFF8D800) else Color.White,
                                     fontSize = 12.sp,
+                                    fontFamily = FontFamily.Monospace,
                                     fontWeight = if (idx < 3 || isMe) FontWeight.Bold else FontWeight.Normal,
                                     modifier = Modifier.weight(1f),
                                     maxLines = 1,
@@ -1201,8 +1447,9 @@ private fun LeaderboardScreen(
                                 )
                                 Text(
                                     text = "${item.score} b.",
-                                    color = Color(0xFF38BDF8),
+                                    color = Color(0xFF68D8F8),
                                     fontSize = 12.sp,
+                                    fontFamily = FontFamily.Monospace,
                                     fontWeight = FontWeight.Bold,
                                     maxLines = 1,
                                     softWrap = false
@@ -1224,22 +1471,24 @@ private fun LeaderboardScreen(
                 onClick = onBack,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(40.dp),
-                shape = RoundedCornerShape(8.dp),
-                colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF334155))
+                    .height(40.dp)
+                    .border(1.dp, Color(0xFF888888)),
+                colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF282828))
             ) {
                 Text(
                     text = "ZPĚT DO MENU",
                     color = Color.White,
                     fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace
                 )
             }
             Spacer(modifier = Modifier.height(3.dp))
             Text(
                 text = "© 2026 Created by Pavel Mareš",
-                color = Color(0xFF64748B),
-                fontSize = 10.sp
+                color = Color(0xFF787878),
+                fontSize = 10.sp,
+                fontFamily = FontFamily.Monospace
             )
         }
     }
